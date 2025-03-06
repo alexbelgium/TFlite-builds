@@ -18,10 +18,10 @@ jobs:
       matrix:
         include:
           - arch: x86_64
-            docker_img: debian:bullseye  # ✅ Use Debian Bullseye instead of Bookworm
+            docker_img: quay.io/pypa/manylinux2014_x86_64  # ✅ Older toolchain
             arch_flag: "--cpu=k8"
           - arch: aarch64
-            docker_img: debian:bullseye  # ✅ Use Debian Bullseye instead of Bookworm
+            docker_img: quay.io/pypa/manylinux2014_aarch64
             arch_flag: "--cpu=aarch64"
 
     steps:
