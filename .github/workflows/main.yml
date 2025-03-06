@@ -2,9 +2,7 @@
 name: publish-tflite-runtime-wheels
 
 on:
-  push:
-    branches: [ "main" ]
-  pull_request:
+  workflow_dispatch:
 
 env:
   TFLITE_VERSION: "1.18.0"  # Customize the version here
