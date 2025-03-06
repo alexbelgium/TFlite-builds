@@ -2,7 +2,9 @@
 name: publish-tflite-runtime-wheels
 
 on:
-  workflow_dispatch:
+  push:
+    branches: [ "main" ]
+  pull_request:
 
 env:
   TFLITE_VERSION: "1.18.0"  # Customize the version here
@@ -59,28 +61,12 @@ jobs:
         run: |
           git clone https://github.com/tensorflow/tensorflow.git
           cd tensorflow
-          git checkout v2.3.0
-
-      - name: Patch TensorFlow to use a compatible Abseil version
-        working-directory: tensorflow
-        run: |
-          sed -i 's/absl_version = "lts_2020_02_25"/absl_version = "lts_2023_06_23"/g' tensorflow/workspace.bzl
+          # Check out the branch/tag corresponding to the desired TF Lite version.
+          git checkout v2.17.1
 
       - name: Patch spectrogram.cc to include cstdint header
         run: |
           sed -i '1i#include <cstdint>' tensorflow/tensorflow/lite/kernels/internal/spectrogram.cc
-
-      - name: Sync TensorFlow dependencies
-        working-directory: tensorflow
-        run: |
-          ./tensorflow/tools/ci_build/update_bazel_deps.sh
-
-      - name: Install Bazelisk (to get Bazel 5.3.0)
-        run: |
-          curl -sSL https://github.com/bazelbuild/bazelisk/releases/download/v1.17.0/bazelisk-linux-amd64 -o bazelisk
-          chmod +x bazelisk
-          sudo mv bazelisk /usr/local/bin/bazel
-          echo "build --bazel_version=5.3.0" >> ~/.bazelrc
 
       - name: Build and produce tflite_runtime wheel
         working-directory: tensorflow
