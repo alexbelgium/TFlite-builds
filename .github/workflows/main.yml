@@ -74,19 +74,32 @@ jobs:
           export TF_PYTHON_VERSION=3.11
           export PYTHON=python3
 
-          # Set CC=clang for compatibility (from tphakala's instructions)
-          export CC=clang
+          export CC=clang  # Ensure correct compiler is used
 
-          # Build the tflite_runtime pip package
+          # Build the pip package
           ./tensorflow/lite/tools/pip_package/build_pip_package_with_bazel.sh native \
             --define=tflite_enable_xnnpack=true \
             --define=xnnpack_enable_subgraph_reshaping=true \
             --define=no_tensorflow_py_deps=true \
             --define=tflite_enable_select_tf_ops=true
 
-          # Rename and store the built wheel
+          # Debug: Check if the expected output directory exists
+          echo "Checking for output directory..."
+          ls -l tensorflow/lite/tools/pip_package/gen/tflite_pip/python3/dist || echo "Output directory does not exist!"
+
+          # Debug: Check if wheel files exist
+          echo "Checking for built wheel files..."
+          find tensorflow/lite/tools/pip_package/gen/tflite_pip/python3/dist -type f || echo "No wheel files found!"
+
+          # Attempt to find and rename the wheel file
           mkdir -p /tmp/tflite_wheels
-          WHEEL_PATH=$(find tensorflow/lite/tools/pip_package/gen/dist -name "*.whl" | head -n 1)
+          WHEEL_PATH=$(find tensorflow/lite/tools/pip_package/gen/tflite_pip/python3/dist -name "*.whl" | head -n 1)
+
+          if [[ -z "$WHEEL_PATH" ]]; then
+            echo "Error: No wheel file found!"
+            exit 1
+          fi
+
           NEW_WHEEL_NAME="tflite_runtime-${{ env.TFLITE_VERSION }}-cp311-cp311-${{ matrix.platform }}_${{ matrix.arch }}.whl"
           mv "$WHEEL_PATH" "/tmp/tflite_wheels/$NEW_WHEEL_NAME"
 
