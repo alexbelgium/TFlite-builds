@@ -7,7 +7,7 @@ on:
   pull_request:
 
 env:
-  TFLITE_VERSION: "1.18.0"  # Customize the version here
+  TFLITE_VERSION: "2.17.1"  # Set TensorFlow Lite version (adapted from TF v2.17.1)
 
 jobs:
   build-tflite-runtime:
@@ -43,7 +43,8 @@ jobs:
             pkg-config \
             git \
             python3-dev \
-            curl
+            curl \
+            clang
 
       - name: Install Python dependencies
         run: |
@@ -61,12 +62,11 @@ jobs:
         run: |
           git clone https://github.com/tensorflow/tensorflow.git
           cd tensorflow
-          # Check out the branch/tag corresponding to the desired TF Lite version.
-          git checkout v2.17.1
+          git checkout tags/v${{ env.TFLITE_VERSION }}
 
-      - name: Patch spectrogram.cc to include cstdint header
+      - name: Patch spectrogram.cc to include cstdint header (if necessary)
         run: |
-          sed -i '1i#include <cstdint>' tensorflow/tensorflow/lite/kernels/internal/spectrogram.cc
+          sed -i '1i#include <cstdint>' tensorflow/tensorflow/lite/kernels/internal/spectrogram.cc || true
 
       - name: Build and produce tflite_runtime wheel
         working-directory: tensorflow
@@ -74,14 +74,17 @@ jobs:
           export TF_PYTHON_VERSION=3.11
           export PYTHON=python3
 
-          # Build the pip package with Bazel using the specified defines:
+          # Set CC=clang for compatibility (from tphakala's instructions)
+          export CC=clang
+
+          # Build the tflite_runtime pip package
           ./tensorflow/lite/tools/pip_package/build_pip_package_with_bazel.sh native \
             --define=tflite_enable_xnnpack=true \
             --define=xnnpack_enable_subgraph_reshaping=true \
-            --define=tflite_enable_select_tf_ops=true \
-            --define=no_tensorflow_py_deps=true
+            --define=no_tensorflow_py_deps=true \
+            --define=tflite_enable_select_tf_ops=true
 
-          # Create a temporary directory for wheels and rename the wheel accordingly:
+          # Rename and store the built wheel
           mkdir -p /tmp/tflite_wheels
           WHEEL_PATH=$(find tensorflow/lite/tools/pip_package/gen/dist -name "*.whl" | head -n 1)
           NEW_WHEEL_NAME="tflite_runtime-${{ env.TFLITE_VERSION }}-cp311-cp311-${{ matrix.platform }}_${{ matrix.arch }}.whl"
