@@ -1,0 +1,98 @@
+# File: .github/workflows/publish-tflite-runtime-wheels.yml
+name: publish-tflite-runtime-wheels
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+
+env:
+  TFLITE_VERSION: "1.18.0"  # <-- Change this to update the version everywhere
+
+jobs:
+  build-tflite-runtime:
+    name: Build tflite_runtime wheels
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            arch: x86_64
+            platform: manylinux_2_28
+          - os: ubuntu-latest
+            arch: aarch64
+            platform: manylinux_2_28
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v3
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v3
+        with:
+          python-version: "3.11"
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            zip \
+            unzip \
+            pkg-config \
+            git \
+            python3-dev \
+            curl
+
+      - name: Install Bazelisk (to get Bazel)
+        run: |
+          curl -sSL https://github.com/bazelbuild/bazelisk/releases/download/v1.17.0/bazelisk-linux-amd64 \
+            -o bazelisk
+          chmod +x bazelisk
+          sudo mv bazelisk /usr/local/bin/bazel
+
+      - name: Clone TensorFlow repo (for TF Lite ${{ env.TFLITE_VERSION }})
+        run: |
+          git clone https://github.com/tensorflow/tensorflow.git
+          cd tensorflow
+          git checkout v2.3.0  # Adjust if needed
+
+      - name: Build and produce tflite_runtime wheel
+        working-directory: tensorflow
+        run: |
+          export TF_PYTHON_VERSION=3.11
+          export PYTHON=python3
+
+          ./tensorflow/lite/tools/pip_package/build_pip_package_with_bazel.sh native \
+            --define=tflite_enable_xnnpack=true \
+            --define=xnnpack_enable_subgraph_reshaping=true \
+            --define=no_tensorflow_py_deps=true
+
+          mkdir -p /tmp/tflite_wheels
+          WHEEL_PATH=$(find tensorflow/lite/tools/pip_package/gen/dist -name "*.whl" | head -n 1)
+
+          # Rename wheel using TFLITE_VERSION
+          NEW_WHEEL_NAME="tflite_runtime-${{ env.TFLITE_VERSION }}-cp311-cp311-${{ matrix.platform }}_${{ matrix.arch }}.whl"
+          mv "$WHEEL_PATH" "/tmp/tflite_wheels/$NEW_WHEEL_NAME"
+
+      - name: Upload wheel artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: tflite_runtime-${{ env.TFLITE_VERSION }}-${{ matrix.arch }}
+          path: /tmp/tflite_wheels/*.whl
+
+      - name: Create GitHub Release (if not exists)
+        run: |
+          gh release view ${{ env.TFLITE_VERSION }} > /dev/null 2>&1 || \
+          gh release create ${{ env.TFLITE_VERSION }} --title "tflite_runtime ${{ env.TFLITE_VERSION }}" --notes "Automated build for tflite_runtime ${{ env.TFLITE_VERSION }}"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload wheels to GitHub Release
+        run: |
+          for file in /tmp/tflite_wheels/*.whl; do
+            gh release upload ${{ env.TFLITE_VERSION }} "$file" --clobber
+          done
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
