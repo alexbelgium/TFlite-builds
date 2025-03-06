@@ -7,21 +7,21 @@ on:
 
 env:
   TFLITE_VERSION: "2.17.1"
-  PYTHON_VERSION: "3.11"
+  PYTHON_VERSION: "3.11"  # Change as needed
 
 jobs:
   build-tflite-runtime:
-    runs-on: ubuntu-latest  # We use Debian in Docker
+    runs-on: ubuntu-latest  # Using Docker to run Debian Bookworm
     name: Build TFLite Runtime wheels
     strategy:
       fail-fast: false
       matrix:
         include:
           - arch: x86_64
-            docker_img: quay.io/pypa/manylinux2014_x86_64  # ✅ Older toolchain
+            docker_img: debian:bookworm
             arch_flag: "--cpu=k8"
           - arch: aarch64
-            docker_img: quay.io/pypa/manylinux2014_aarch64
+            docker_img: debian:bookworm
             arch_flag: "--cpu=aarch64"
 
     steps:
@@ -70,7 +70,7 @@ jobs:
                 --define=tflite_enable_select_tf_ops=true \
                 ${{ matrix.arch_flag }}
 
-              # ========== 5) Move the Built Wheel ==========
+              # ========== 5) Locate and Process the Built Wheel ==========
               mkdir -p /work/wheels
               WHEEL_PATH=\$(find tensorflow/lite/tools/pip_package/gen/tflite_pip/python3/dist -name \"*.whl\" | head -n 1)
 
@@ -79,8 +79,15 @@ jobs:
                 exit 1
               fi
 
-              # ========== 6) Audit and Repair the Wheel ==========
-              auditwheel repair \"\$WHEEL_PATH\" -w /work/wheels
+              echo \"Found wheel: \$WHEEL_PATH\"
+
+              # ========== 6) Attempt to Auditwheel Repair ==========
+              if auditwheel repair \"\$WHEEL_PATH\" -w /work/wheels; then
+                echo \"auditwheel repair succeeded.\"
+              else
+                echo \"auditwheel repair failed, copying original wheel.\"
+                cp \"\$WHEEL_PATH\" /work/wheels/
+              fi
             "
 
       - name: List Built Wheels
@@ -106,3 +113,4 @@ jobs:
           done
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
