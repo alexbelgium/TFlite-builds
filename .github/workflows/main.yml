@@ -1,4 +1,3 @@
-# File: .github/workflows/publish-tflite-runtime-wheels.yml
 name: publish-tflite-runtime-wheels
 
 on:
@@ -7,7 +6,7 @@ on:
   pull_request:
 
 env:
-  TFLITE_VERSION: "1.18.0"  # <-- Change this to update the version everywhere
+  TFLITE_VERSION: "1.18.0"
 
 jobs:
   build-tflite-runtime:
@@ -61,7 +60,11 @@ jobs:
         run: |
           git clone https://github.com/tensorflow/tensorflow.git
           cd tensorflow
-          git checkout v2.3.0  # Adjust if needed
+          git checkout v2.3.0
+
+      - name: Patch spectrogram.cc to include cstdint header
+        run: |
+          sed -i '1i#include <cstdint>' tensorflow/tensorflow/lite/kernels/internal/spectrogram.cc
 
       - name: Build and produce tflite_runtime wheel
         working-directory: tensorflow
