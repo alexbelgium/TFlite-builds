@@ -17,10 +17,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-latest
+          - os: ubuntu-20.04
             arch: x86_64
             platform: manylinux_2_28
-          - os: ubuntu-latest
+          - os: ubuntu-20.04
             arch: aarch64
             platform: manylinux_2_28
 
@@ -67,12 +67,6 @@ jobs:
       - name: Patch spectrogram.cc to include cstdint header (if necessary)
         run: |
           sed -i '1i#include <cstdint>' tensorflow/tensorflow/lite/kernels/internal/spectrogram.cc || true
-
-      - name: Install glibc 2.31 (for compatibility)
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libc6=2.31-0ubuntu9.9 libc6-dev
-          sudo apt-mark hold libc6  # Prevent accidental upgrades
 
       - name: Build and produce tflite_runtime wheel
         working-directory: tensorflow
