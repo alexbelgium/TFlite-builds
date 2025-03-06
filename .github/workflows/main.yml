@@ -7,7 +7,7 @@ on:
 
 env:
   TFLITE_VERSION: "2.17.1"
-  PYTHON_VERSION: "3.11"  # Easily change Python version here
+  PYTHON_VERSION: "3.11"
 
 jobs:
   build-tflite-runtime:
@@ -37,27 +37,31 @@ jobs:
             bash -c "
               set -eux
 
-              # ========== 1) Install Dependencies ==========
+              # ========== 1) Install System Dependencies ==========
               apt-get update
-              apt-get install -y build-essential python${PYTHON_VERSION} python${PYTHON_VERSION}-dev python3-pip \
-                                 clang git zip unzip pkg-config curl
+              apt-get install -y build-essential python${PYTHON_VERSION} python${PYTHON_VERSION}-venv \
+                                 python${PYTHON_VERSION}-dev clang git zip unzip pkg-config curl
 
               # Install Bazelisk (to fetch Bazel automatically)
               curl -sSL https://github.com/bazelbuild/bazelisk/releases/download/v1.17.0/bazelisk-linux-amd64 -o /usr/local/bin/bazel
               chmod +x /usr/local/bin/bazel
 
-              # Upgrade pip and install required Python packages
-              python${PYTHON_VERSION} -m pip install --upgrade pip wheel numpy auditwheel
+              # ========== 2) Create and Activate a Virtual Environment ==========
+              python${PYTHON_VERSION} -m venv /opt/tflite_env
+              source /opt/tflite_env/bin/activate
 
-              # ========== 2) Clone TensorFlow v2.17.1 ==========
+              # Upgrade pip and install required Python packages inside the venv
+              pip install --upgrade pip wheel numpy auditwheel
+
+              # ========== 3) Clone TensorFlow v2.17.1 ==========
               git clone https://github.com/tensorflow/tensorflow.git
               cd tensorflow
               git checkout tags/v${TFLITE_VERSION}
 
-              # ========== 3) Build TFLite Runtime ==========
+              # ========== 4) Build TFLite Runtime ==========
               export CC=clang
               export TF_PYTHON_VERSION=${PYTHON_VERSION}
-              export PYTHON=python${PYTHON_VERSION}
+              export PYTHON=/opt/tflite_env/bin/python
 
               ./tensorflow/lite/tools/pip_package/build_pip_package_with_bazel.sh native \
                 --define=tflite_enable_xnnpack=true \
@@ -66,7 +70,7 @@ jobs:
                 --define=tflite_enable_select_tf_ops=true \
                 ${{ matrix.arch_flag }}
 
-              # ========== 4) Move the Built Wheel ==========
+              # ========== 5) Move the Built Wheel ==========
               mkdir -p /work/wheels
               WHEEL_PATH=\$(find tensorflow/lite/tools/pip_package/gen/tflite_pip/python3/dist -name \"*.whl\" | head -n 1)
 
@@ -75,7 +79,7 @@ jobs:
                 exit 1
               fi
 
-              # ========== 5) Audit and Repair the Wheel ==========
+              # ========== 6) Audit and Repair the Wheel ==========
               auditwheel repair \"\$WHEEL_PATH\" -w /work/wheels
             "
 
