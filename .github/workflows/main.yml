@@ -11,17 +11,17 @@ env:
 
 jobs:
   build-tflite-runtime:
-    runs-on: ubuntu-latest  # Using Debian Bookworm in Docker
+    runs-on: ubuntu-latest  # We use Debian in Docker
     name: Build TFLite Runtime wheels
     strategy:
       fail-fast: false
       matrix:
         include:
           - arch: x86_64
-            docker_img: debian:bookworm
+            docker_img: debian:bullseye  # ✅ Use Debian Bullseye instead of Bookworm
             arch_flag: "--cpu=k8"
           - arch: aarch64
-            docker_img: debian:bookworm
+            docker_img: debian:bullseye  # ✅ Use Debian Bullseye instead of Bookworm
             arch_flag: "--cpu=aarch64"
 
     steps:
