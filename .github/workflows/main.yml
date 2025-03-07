@@ -73,7 +73,6 @@ jobs:
                 --define=tflite_enable_xnnpack=true \
                 --define=xnnpack_enable_subgraph_reshaping=true \
                 --define=no_tensorflow_py_deps=true \
-                --define=tflite_enable_select_tf_ops=true \
                 ${{ matrix.arch_flag }}
 
               # ========== 5) Locate and Process the Built Wheel ==========
