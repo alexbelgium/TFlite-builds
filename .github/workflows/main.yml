@@ -165,6 +165,12 @@ release:
 
     - name: Upload Wheels to GitHub Release
       run: |
-        gh release upload ${{ env.TFLITE_VERSION }} wheels/**/*.whl --clobber -R "${{ github.repository }}"
+        for dir in wheels/*; do
+          file=$(find "$dir" -maxdepth 1 -name "*.whl")
+          arch=$(basename "$dir")
+          newname=$(basename "$file" .whl)-${arch}.whl
+          echo "Uploading $file as $newname"
+          gh release upload ${{ env.TFLITE_VERSION }} "$file" --clobber -R "${{ github.repository }}" --name "$newname"
+        done
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
