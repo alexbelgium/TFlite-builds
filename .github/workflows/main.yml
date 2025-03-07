@@ -1,4 +1,4 @@
-anname: publish-tflite-runtime-wheels
+name: publish-tflite-runtime-wheels
 
 on:
   push:
