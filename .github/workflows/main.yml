@@ -62,7 +62,7 @@ jobs:
           case "$ARCH" in
             x86_64) ARCH_FLAG="--cpu=k8";;
             x86_64_noavx) ARCH_FLAG="--cpu=core2 --copt=-mno-avx --copt=-mno-avx2 --copt=-msse4.2 --copt=-msse4.1";;
-            aarch64) ARCH_FLAG="--config=elinux_aarch64";;
+            aarch64) ARCH_FLAG="--config=elinux_aarch64 --migrate";;
             *)
               echo "Warning: Unknown architecture '$ARCH'"
               exit 1
@@ -110,11 +110,9 @@ jobs:
               esac
               chmod +x /usr/local/bin/bazel
 
-
-
               # ========== 3) Set up Bazel Cache Permissions ==========
-              mkdir -p /root/.cache/bazel
-              chmod -R u+rw /root/.cache/bazel
+              #mkdir -p /root/.cache/bazel
+              #chmod -R u+rw /root/.cache/bazel
 
               # ========== 4) Create and Activate Virtual Environment ==========
               python -m venv /opt/tflite_env
@@ -139,6 +137,7 @@ jobs:
                 --define=tflite_enable_xnnpack=true \
                 --define=xnnpack_enable_subgraph_reshaping=true \
                 --define=no_tensorflow_py_deps=true \
+                --migrate \
                 $ARCH_FLAG \
                 $GLOBAL_FLAGS
 
