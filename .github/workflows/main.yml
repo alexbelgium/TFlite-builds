@@ -43,11 +43,11 @@ jobs:
 
           # Set architecture-specific build flags.
           if [[ "$ARCH" == "x86_64" ]]; then
-            ARCH_FLAG="--cpu=k8 --copt=-march=native"
+            ARCH_FLAG="--cpu=k8"
           elif [[ "$ARCH" == "aarch64" ]]; then
-            ARCH_FLAG="--cpu=aarch64 --copt=-mcpu=cortex-a53 --config=elinux_aarch64"
+            ARCH_FLAG="--cpu=aarch64 --config=elinux_aarch64"
           elif [[ "$ARCH" == "x86_64_noavx" ]]; then
-            ARCH_FLAG="--cpu=core2 --copt=-march=native --copt=-mno-avx --copt=-mno-avx2 --copt=-msse4.2 --copt=-msse4.1"
+            ARCH_FLAG="--cpu=core2 --copt=-mno-avx --copt=-mno-avx2 --copt=-msse4.2 --copt=-msse4.1"
           else
             echo \"Unknown architecture: $ARCH\"
             exit 1
