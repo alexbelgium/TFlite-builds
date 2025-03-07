@@ -19,11 +19,11 @@ jobs:
         include:
           - arch: x86_64
             docker_img: debian:bookworm
-            arch_flag: "--cpu=k8"
+            arch_flag: "--cpu=k8 --copt=-flto --linkopt=-flto"
             avx: false
           - arch: aarch64
             docker_img: debian:bookworm
-            arch_flag: "--cpu=aarch64"
+            arch_flag: "--cpu=aarch64 --copt=-flto --linkopt=-flto"
             avx: false
           - arch: x86_64_noavx
             docker_img: debian:bookworm
