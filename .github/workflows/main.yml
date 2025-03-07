@@ -1,7 +1,7 @@
 anname: publish-tflite-runtime-wheels
 
 on:
-  push:an
+  push:
     branches: [ "main" ]
   pull_request:
 
