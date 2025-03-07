@@ -18,8 +18,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        arch: [ x86_64, aarch64, x86_64_noavx ]
-        python: [ "3.9", "3.10", "3.11", "3.12" ]
+        arch: [x86_64, aarch64, x86_64_noavx]
+        python: ["3.9", "3.10", "3.11", "3.12"]
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -32,35 +32,37 @@ jobs:
         run: |
           ARCH=${{ matrix.arch }}
           PYTHON_VERSION=${{ matrix.python }}
-      
+
           # We'll just use a Debian/Bookworm image (x86_64).
           DOCKER_IMG="python:${PYTHON_VERSION}-slim-bookworm"
-      
+
           # Set global Bazel flags (example optimization flags).
           GLOBAL_FLAGS="--config=monolithic \
                         --copt=-DNDEBUG --copt=-fdata-sections --linkopt=-Wl,--gc-sections \
                         --copt=-O3 --copt=-flto --linkopt=-flto --strip=always"
-      
+
           # ARCH-specific build flags.
           if [[ "$ARCH" == "x86_64" ]]; then
             ARCH_FLAG="--cpu=k8"
           elif [[ "$ARCH" == "aarch64" ]]; then
-            # Append additional flags to remove SSE flags for ARM.
-            ARCH_FLAG="--cpu=aarch64 --config=elinux_aarch64 --copt=-mno-sse4.2 --copt=-mno-sse4.1"
+            # Specify the ARM toolchain and target configuration
+            ARCH_FLAG="--cpu=aarch64 --config=elinux_aarch64 \
+                       --crosstool_top=@local_config_arm_compiler//:toolchain \
+                       --host_crosstool_top=@bazel_tools//tools/cpp:toolchain"
           elif [[ "$ARCH" == "x86_64_noavx" ]]; then
             ARCH_FLAG="--cpu=core2 --copt=-mno-avx --copt=-mno-avx2 --copt=-msse4.2 --copt=-msse4.1"
           else
-            echo \"Unknown architecture: $ARCH\"
+            echo "Unknown architecture: $ARCH"
             exit 1
           fi
-      
+
           docker run --rm \
             -v $PWD:/work \
             -w /work \
             $DOCKER_IMG \
             bash -c "
               set -eux
-      
+
               # -----------------------
               # 1) Install Dependencies
               # -----------------------
@@ -70,49 +72,53 @@ jobs:
                 build-essential \
                 zlib1g-dev \
                 lld
-      
-              # For aarch64 cross-compilation, install the cross toolchain.
+
+              # For x86_64 builds, system compilers suffice. But for aarch64 cross-compile:
               if [ \"$ARCH\" = \"aarch64\" ]; then
                 apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
               fi
-      
+
               # -----------------------
               # 2) Install Bazelisk
               # -----------------------
+              # Always get the x86_64 Bazelisk because we're on an x86_64 container.
               curl -sSL https://github.com/bazelbuild/bazelisk/releases/download/v1.17.0/bazelisk-linux-amd64 -o /usr/local/bin/bazel
               chmod +x /usr/local/bin/bazel
-      
+
               # -----------------------
-              # 3) Set up Python environment and pip dependencies
+              # 3) Python env + pip deps
               # -----------------------
               python -m venv /opt/tflite_env
               source /opt/tflite_env/bin/activate
               pip install --upgrade pip wheel numpy auditwheel setuptools
-      
+
               # -----------------------
               # 4) Clone TensorFlow
               # -----------------------
               git clone https://github.com/tensorflow/tensorflow.git
               cd tensorflow
               git checkout tags/v${TFLITE_VERSION}
-      
+
               # -----------------------
-              # 5) Set Cross-Compile Environment
+              # 5) Set Cross-Compile Env
               # -----------------------
               export TF_PYTHON_VERSION=${PYTHON_VERSION}
               export PYTHON=/opt/tflite_env/bin/python
-      
+
               if [ \"$ARCH\" = \"aarch64\" ]; then
+                # Point CC/CXX to the cross toolchain
                 export CC=aarch64-linux-gnu-gcc
                 export CXX=aarch64-linux-gnu-g++
+                # Use LLD if you want to accelerate linking:
                 export LDFLAGS=\"-fuse-ld=lld\"
               else
+                # For x86_64 or x86_64_noavx, use default compilers
                 export CC=gcc
                 export CXX=g++
               fi
-      
+
               # -----------------------
-              # 6) Build TFLite Runtime with Bazel
+              # 6) Build TFLite Runtime
               # -----------------------
               ./tensorflow/lite/tools/pip_package/build_pip_package_with_bazel.sh \
                 --define=tflite_enable_xnnpack=true \
@@ -120,18 +126,19 @@ jobs:
                 --define=no_tensorflow_py_deps=true \
                 $ARCH_FLAG \
                 $GLOBAL_FLAGS
-      
+
               # -----------------------
               # 7) Move Wheel
               # -----------------------
               mkdir -p /work/wheels
               WHEEL_PATH=\$(find tensorflow/lite/tools/pip_package/gen/tflite_pip/python3/dist -name \"*.whl\" | head -n 1)
-      
+
               if [[ -z \"\$WHEEL_PATH\" ]]; then
                 echo \"Error: No wheel file found!\"
                 exit 1
               fi
-      
+
+              # Generate the new filename
               if [[ \"$ARCH\" == \"x86_64_noavx\" ]]; then
                 ARCH_NAME=\"x86_64_noavx\"
               elif [[ \"$ARCH\" == \"x86_64\" ]]; then
@@ -139,17 +146,17 @@ jobs:
               elif [[ \"$ARCH\" == \"aarch64\" ]]; then
                 ARCH_NAME=\"aarch64\"
               fi
-      
+
               NEW_WHEEL_PATH=\"/work/wheels/tflite_runtime-${TFLITE_VERSION}-${PYTHON_VERSION}-linux_\${ARCH_NAME}.whl\"
               mv \"\$WHEEL_PATH\" \"\$NEW_WHEEL_PATH\"
             "
 
       - name: List Built Wheels
         run: ls -l wheels
-      
+
       - name: Verify Wheel Architectures
         run: file wheels/*.whl
-      
+
       - name: Upload Wheel Artifact
         uses: actions/upload-artifact@v4
         with:
@@ -159,7 +166,6 @@ jobs:
   release:
     runs-on: ubuntu-latest
     needs: build-tflite-runtime
-    name: Create and Upload Release
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
