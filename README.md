@@ -1,5 +1,9 @@
 # TFlite-builds
 
+TF lite runtimes to use with birdnet-pi
+
+[![publish-tflite-runtime-wheels](https://github.com/alexbelgium/TFlite-bookworm/actions/workflows/main.yml/badge.svg)](https://github.com/alexbelgium/TFlite-bookworm/actions/workflows/main.yml)
+
 ## TFlite runtimes
 - Base : Debian bookworm
 - Architectures : x86_64 ; aarch64 ; x86_64_non_avx
