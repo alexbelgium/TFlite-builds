@@ -74,11 +74,14 @@ jobs:
           esac
 
           # Set the Docker platform flag.
-          if [[ "$ARCH" == "aarch64" ]]; then
-            PLATFORM_FLAG="--platform=linux/arm64"
-          else
-            PLATFORM_FLAG="--platform=linux/amd64"
-          fi
+          case "$ARCH" in
+            x86_64) PLATFORM_FLAG="--platform=linux/amd64";;
+            aarch64) PLATFORM_FLAG="--platform=linux/arm64";;
+            *)
+              echo "Warning: Unknown architecture '$ARCH'"
+              exit 1
+              ;;
+          esac
 
           docker run --rm --privileged $PLATFORM_FLAG \
             -v $PWD:/work \
