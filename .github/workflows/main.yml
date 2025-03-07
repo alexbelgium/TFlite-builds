@@ -111,44 +111,42 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
-
+  
       - name: Download x86_64 Artifact
         uses: actions/download-artifact@v4
         with:
           name: tflite_runtime-${{ env.TFLITE_VERSION }}-x86_64
-          path: wheels
-
+          path: wheels/x86_64
+  
       - name: Download aarch64 Artifact
         uses: actions/download-artifact@v4
         with:
           name: tflite_runtime-${{ env.TFLITE_VERSION }}-aarch64
-          path: wheels
-
+          path: wheels/aarch64
+  
       - name: Download No-AVX Artifact
         uses: actions/download-artifact@v4
         with:
           name: tflite_runtime-${{ env.TFLITE_VERSION }}-x86_64_noavx
-          path: wheels
-
+          path: wheels/x86_64_noavx
+  
       - name: List Downloaded Wheels
-        run: ls -l wheels
-
+        run: find wheels
+  
       - name: Authenticate GitHub CLI
         run: gh auth status
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
+  
       - name: Create GitHub Release (if not exists)
         run: |
           gh release view ${{ env.TFLITE_VERSION }} > /dev/null 2>&1 || \
           gh release create ${{ env.TFLITE_VERSION }} --title "tflite_runtime ${{ env.TFLITE_VERSION }}" --notes "Automated build for tflite_runtime ${{ env.TFLITE_VERSION }}"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
+  
       - name: Upload Wheels to GitHub Release
         run: |
-          for file in wheels/*.whl; do
-            gh release upload ${{ env.TFLITE_VERSION }} "$file" --clobber
-          done
+          gh release upload ${{ env.TFLITE_VERSION }} wheels/**/*.whl --clobber
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
