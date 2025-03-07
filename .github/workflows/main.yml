@@ -6,7 +6,7 @@ on:
   pull_request:
 
 permissions:
-  contents: write
+  contents: write  # Ensure GITHUB_TOKEN can create releases
 
 env:
   TFLITE_VERSION: "2.17.1"
@@ -23,15 +23,12 @@ jobs:
           - arch: x86_64
             docker_img: debian:bookworm
             arch_flag: "--cpu=k8 --copt=-flto --linkopt=-flto"
-            avx: false
           - arch: aarch64
             docker_img: debian:bookworm
             arch_flag: "--cpu=aarch64 --copt=-flto --linkopt=-flto"
-            avx: false
           - arch: x86_64_noavx
             docker_img: debian:bookworm
             arch_flag: "--cpu=core2 --copt=-mno-avx --copt=-mno-avx2 --copt=-msse4.2 --copt=-msse4.1"
-            avx: true
 
     steps:
       - name: Check out repository
@@ -78,7 +75,7 @@ jobs:
                 --define=no_tensorflow_py_deps=true \
                 ${{ matrix.arch_flag }}
 
-              # ========== 5) Locate and Process the Built Wheel ==========
+              # ========== 5) Locate and Rename the Built Wheel ==========
               mkdir -p /work/wheels
               WHEEL_PATH=\$(find tensorflow/lite/tools/pip_package/gen/tflite_pip/python3/dist -name \"*.whl\" | head -n 1)
 
@@ -89,29 +86,26 @@ jobs:
 
               echo \"Found wheel: \$WHEEL_PATH\"
 
-              # ========== 6) Attempt to Auditwheel Repair ==========
-              if auditwheel repair \"\$WHEEL_PATH\" -w /work/wheels; then
-                echo \"auditwheel repair succeeded.\"
+              # Determine correct architecture name
+              if [[ \"${{ matrix.arch }}\" == \"x86_64_noavx\" ]]; then
+                ARCH_NAME=\"linux_x86_64_noavx\"
+              elif [[ \"${{ matrix.arch }}\" == \"x86_64\" ]]; then
+                ARCH_NAME=\"linux_x86_64\"
+              elif [[ \"${{ matrix.arch }}\" == \"aarch64\" ]]; then
+                ARCH_NAME=\"linux_aarch64\"
               else
-                echo \"auditwheel repair failed, copying original wheel.\"
-                cp \"\$WHEEL_PATH\" /work/wheels/
+                ARCH_NAME=\"unknown\"
               fi
+
+              # Rename the wheel with the correct architecture
+              NEW_WHEEL_PATH=\"/work/wheels/\$(basename \"\$WHEEL_PATH\" .whl)-\${ARCH_NAME}.whl\"
+              mv \"\$WHEEL_PATH\" \"\$NEW_WHEEL_PATH\"
+
+              echo \"Renamed wheel to: \$NEW_WHEEL_PATH\"
             "
 
-      - name: Rename Wheel Files
-        run: |
-          WHEEL_PATH=$(find wheels -name "*.whl" | head -n 1)
-          if [[ -z "$WHEEL_PATH" ]]; then
-            echo "Error: No wheel file found!"
-            exit 1
-          fi
-
-          NEW_NAME="tflite_runtime-${{ env.TFLITE_VERSION }}-cp311-cp311-linux_${{ matrix.arch }}.whl"
-          mv "$WHEEL_PATH" "wheels/$NEW_NAME"
-          echo "Renamed wheel to: $NEW_NAME"
-
       - name: List Built Wheels
-        run: find wheels
+        run: ls -l wheels
 
       - name: Upload Wheel Artifact
         uses: actions/upload-artifact@v4
@@ -126,33 +120,20 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
-  
-      - name: Download x86_64 Artifact
+
+      - name: Download All Artifacts
         uses: actions/download-artifact@v4
         with:
-          name: tflite_runtime-${{ env.TFLITE_VERSION }}-x86_64
-          path: wheels/x86_64
-  
-      - name: Download aarch64 Artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: tflite_runtime-${{ env.TFLITE_VERSION }}-aarch64
-          path: wheels/aarch64
-  
-      - name: Download No-AVX Artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: tflite_runtime-${{ env.TFLITE_VERSION }}-x86_64_noavx
-          path: wheels/x86_64_noavx
-  
+          path: wheels
+
       - name: List Downloaded Wheels
         run: find wheels
-  
+
       - name: Authenticate GitHub CLI
         run: gh auth status
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  
+
       - name: Create GitHub Release (if not exists)
         run: |
           gh release view ${{ env.TFLITE_VERSION }} -R "${{ github.repository }}" > /dev/null 2>&1 || \
@@ -162,15 +143,9 @@ jobs:
             --notes "Automated build for tflite_runtime ${{ env.TFLITE_VERSION }}"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  
+
       - name: Upload Wheels to GitHub Release
         run: |
-          for dir in wheels/*; do
-            file=$(find "$dir" -maxdepth 1 -name "*.whl")
-            arch=$(basename "$dir")
-            newname=$(basename "$file" .whl)-${arch}.whl
-            echo "Uploading $file as $newname"
-            gh release upload ${{ env.TFLITE_VERSION }} "$file" --clobber -R "${{ github.repository }}" --name "$newname"
-          done
+          gh release upload ${{ env.TFLITE_VERSION }} wheels/**/*.whl --clobber -R "${{ github.repository }}"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
