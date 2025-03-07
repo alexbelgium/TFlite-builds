@@ -6,7 +6,7 @@ on:
   pull_request:
 
 env:
-  TFLITE_VERSION: "2.18"
+  TFLITE_VERSION: "2.19.0-rc0"
   PYTHON_VERSION: "3.11"
 
 jobs:
