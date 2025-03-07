@@ -10,7 +10,6 @@ permissions:
 
 env:
   TFLITE_VERSION: "2.17.1"
-  PYTHON_VERSION: "3.11"
 
 jobs:
   build-tflite-runtime:
@@ -19,17 +18,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - arch: x86_64
-            docker_img: debian:bookworm
-            arch_flag: "--cpu=k8 --copt=-flto --linkopt=-flto"
-          - arch: aarch64
-            docker_img: debian:bookworm
-            arch_flag: "--cpu=aarch64 --copt=-flto --linkopt=-flto"
-          - arch: x86_64_noavx
-            docker_img: debian:bookworm
-            arch_flag: "--cpu=core2 --copt=-mno-avx --copt=-mno-avx2 --copt=-msse4.2 --copt=-msse4.1"
-
+        arch: [x86_64, aarch64, x86_64_noavx]
+        python: [3.9, 3.10, 3.11, 3.12]
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -43,8 +33,24 @@ jobs:
       - name: Run Build in Debian Bookworm Container
         run: |
           ARCH=${{ matrix.arch }}
-          DOCKER_IMG=${{ matrix.docker_img }}
+          PYTHON_VERSION=${{ matrix.python }}
+          
+          # Set docker image and architecture-specific flags based on ARCH
+          if [[ "$ARCH" == "x86_64" ]]; then
+            DOCKER_IMG="debian:bookworm"
+            ARCH_FLAG="--cpu=k8 --copt=-flto --linkopt=-flto"
+          elif [[ "$ARCH" == "aarch64" ]]; then
+            DOCKER_IMG="debian:bookworm"
+            ARCH_FLAG="--cpu=aarch64 --copt=-flto --linkopt=-flto"
+          elif [[ "$ARCH" == "x86_64_noavx" ]]; then
+            DOCKER_IMG="debian:bookworm"
+            ARCH_FLAG="--cpu=core2 --copt=-mno-avx --copt=-mno-avx2 --copt=-msse4.2 --copt=-msse4.1"
+          else
+            echo "Unknown architecture: $ARCH"
+            exit 1
+          fi
 
+          # Set platform flag for Docker
           if [[ "$ARCH" == "aarch64" ]]; then
             PLATFORM_FLAG="--platform=linux/arm64"
           else
@@ -88,7 +94,7 @@ jobs:
                 --define=tflite_enable_xnnpack=true \
                 --define=xnnpack_enable_subgraph_reshaping=true \
                 --define=no_tensorflow_py_deps=true \
-                ${{ matrix.arch_flag }}
+                $ARCH_FLAG
 
               # ========== 5) Locate and Rename the Built Wheel ==========
               mkdir -p /work/wheels
@@ -112,8 +118,8 @@ jobs:
                 ARCH_NAME=\"unknown\"
               fi
 
-              # Rename the wheel with the correct architecture
-              NEW_WHEEL_PATH=\"/work/wheels/\$(basename \"\$WHEEL_PATH\" .whl)-\${ARCH_NAME}.whl\"
+              # Append Python version to the wheel name
+              NEW_WHEEL_PATH=\"/work/wheels/\$(basename \"\$WHEEL_PATH\" .whl)-\${ARCH_NAME}-py${PYTHON_VERSION}.whl\"
               mv \"\$WHEEL_PATH\" \"\$NEW_WHEEL_PATH\"
 
               echo \"Renamed wheel to: \$NEW_WHEEL_PATH\"
@@ -128,7 +134,7 @@ jobs:
       - name: Upload Wheel Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: tflite_runtime-${{ env.TFLITE_VERSION }}-${{ matrix.arch }}
+          name: tflite_runtime-${{ env.TFLITE_VERSION }}-${{ matrix.arch }}-py${{ matrix.python }}
           path: wheels/*.whl
 
   release:
