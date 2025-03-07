@@ -45,7 +45,7 @@ jobs:
         run: |
           set -eux
           ARCH="${{ matrix.arch }}"
-          PYTHON_VERSION=${{ matrix.python }}"
+          PYTHON_VERSION="${{ matrix.python }}"
 
           echo "Building for architecture: $ARCH"
 
