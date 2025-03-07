@@ -18,134 +18,106 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        arch: [ x86_64, aarch64, x86_64_noavx ]
-        python: [ "3.9", "3.10", "3.11", "3.12" ]
+        arch: [x86_64, aarch64, x86_64_noavx]
+        python: ["3.9", "3.10", "3.11", "3.12"]
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      # ---------------------------------------------------------
-      # No QEMU steps here, because we are cross-compiling, not emulating.
-      # ---------------------------------------------------------
+      - name: Set up QEMU for ARM Emulation
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y qemu-user-static binfmt-support
+          docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
 
       - name: Run Build in Container
         run: |
           ARCH=${{ matrix.arch }}
           PYTHON_VERSION=${{ matrix.python }}
 
-          # We'll just use a Debian/Bookworm image (x86_64).
           DOCKER_IMG="python:${PYTHON_VERSION}-slim-bookworm"
 
-          # Set global Bazel flags (example optimization flags).
+          # Global Bazel flags (added --linkopt=-fuse-ld=lld, you can drop clang if you prefer gcc)
           GLOBAL_FLAGS="--copt=-O3 --copt=-flto --linkopt=-flto --strip=always"
 
-          # ARCH-specific build flags.
-          # For cross-compiling aarch64:
-          #   - We set --config=elinux_aarch64
-          #   - We will override CC/CXX to the cross-toolchain inside the container.
-          if [[ "$ARCH" == "x86_64" ]]; then
+          if [[ "$ARCH" == "aarch64" ]]; then
+            ARCH_FLAG="--cpu=aarch64 --config=elinux_aarch64"
+            PLATFORM_FLAG="--platform=linux/arm64"
+          elif [[ "$ARCH" == "x86_64" ]]; then
             ARCH_FLAG="--cpu=k8"
-          elif [[ "$ARCH" == "aarch64" ]]; then
-            ARCH_FLAG="--config=elinux_aarch64"
+            PLATFORM_FLAG="--platform=linux/amd64"
           elif [[ "$ARCH" == "x86_64_noavx" ]]; then
-            ARCH_FLAG="--cpu=core2 --copt=-mno-avx --copt=-mno-avx2"
+            ARCH_FLAG="--cpu=core2 --copt=-mno-avx --copt=-mno-avx2 --copt=-msse4.2 --copt=-msse4.1"
+            PLATFORM_FLAG="--platform=linux/amd64"
           else
             echo "Unknown architecture: $ARCH"
             exit 1
           fi
 
-          docker run --rm \
+          docker run --rm --privileged $PLATFORM_FLAG \
             -v $PWD:/work \
             -w /work \
             $DOCKER_IMG \
             bash -c "
               set -eux
-
-              # -----------------------
-              # 1) Install Dependencies
-              # -----------------------
               apt-get update
               apt-get install -y \
-                git zip unzip pkg-config curl \
                 build-essential \
+                clang \
+                git \
+                zip \
+                unzip \
+                pkg-config \
+                curl \
                 zlib1g-dev \
                 lld
 
-              # For x86_64 builds, system compilers suffice. But for aarch64 cross-compile:
-              if [ \"$ARCH\" = \"aarch64\" ]; then
-                apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
-              fi
+              # Optionally skip clang for ARM: apt-get remove clang
+              # or just do not export CC=clang below.
 
-              # -----------------------
-              # 2) Install Bazelisk
-              # -----------------------
-              # Always get the x86_64 Bazelisk because we're on an x86_64 container.
-              curl -sSL https://github.com/bazelbuild/bazelisk/releases/download/v1.17.0/bazelisk-linux-amd64 -o /usr/local/bin/bazel
+              # Install Bazelisk
+              if [[ \"$ARCH\" == \"aarch64\" ]]; then
+                curl -sSL https://github.com/bazelbuild/bazelisk/releases/download/v1.17.0/bazelisk-linux-arm64 -o /usr/local/bin/bazel
+              else
+                curl -sSL https://github.com/bazelbuild/bazelisk/releases/download/v1.17.0/bazelisk-linux-amd64 -o /usr/local/bin/bazel
+              fi
               chmod +x /usr/local/bin/bazel
 
-              # -----------------------
-              # 3) Python env + pip deps
-              # -----------------------
               python -m venv /opt/tflite_env
               source /opt/tflite_env/bin/activate
               pip install --upgrade pip wheel numpy auditwheel setuptools
 
-              # -----------------------
-              # 4) Clone TensorFlow
-              # -----------------------
               git clone https://github.com/tensorflow/tensorflow.git
               cd tensorflow
               git checkout tags/v${TFLITE_VERSION}
 
-              # -----------------------
-              # 5) Set Cross-Compile Env
-              # -----------------------
+              # If you really want clang:
+              export CC=clang
+              export CXX=clang++
+
               export TF_PYTHON_VERSION=${PYTHON_VERSION}
               export PYTHON=/opt/tflite_env/bin/python
 
-              if [ \"$ARCH\" = \"aarch64\" ]; then
-                # Point CC/CXX to the cross toolchain
-                export CC=aarch64-linux-gnu-gcc
-                export CXX=aarch64-linux-gnu-g++
-                # Use LLD if you want to accelerate linking:
-                export LDFLAGS=\"-fuse-ld=lld\"
-              else
-                # For x86_64 or x86_64_noavx, use default compilers
-                export CC=gcc
-                export CXX=g++
-              fi
-
-              # -----------------------
-              # 6) Build TFLite Runtime with Bazel
-              # -----------------------
-              export CXXFLAGS="-mno-sse -mno-sse2 -mno-sse3 -mno-sse4.1 -mno-sse4.2"
               ./tensorflow/lite/tools/pip_package/build_pip_package_with_bazel.sh \
                 --define=tflite_enable_xnnpack=true \
                 --define=xnnpack_enable_subgraph_reshaping=true \
                 --define=no_tensorflow_py_deps=true \
-                $ARCH_FLAG \
-                $GLOBAL_FLAGS
+                ${ARCH_FLAG} \
+                ${GLOBAL_FLAGS}
 
-              # -----------------------
-              # 7) Move Wheel
-              # -----------------------
               mkdir -p /work/wheels
               WHEEL_PATH=\$(find tensorflow/lite/tools/pip_package/gen/tflite_pip/python3/dist -name \"*.whl\" | head -n 1)
-
               if [[ -z \"\$WHEEL_PATH\" ]]; then
                 echo \"Error: No wheel file found!\"
                 exit 1
               fi
-
-              # Generate the new filename
-              if [[ \"$ARCH\" == \"x86_64_noavx\" ]]; then
-                ARCH_NAME=\"x86_64_noavx\"
+              if [[ \"$ARCH\" == \"aarch64\" ]]; then
+                ARCH_NAME=\"aarch64\"
               elif [[ \"$ARCH\" == \"x86_64\" ]]; then
                 ARCH_NAME=\"x86_64\"
-              elif [[ \"$ARCH\" == \"aarch64\" ]]; then
-                ARCH_NAME=\"aarch64\"
+              else
+                ARCH_NAME=\"x86_64_noavx\"
               fi
-
               NEW_WHEEL_PATH=\"/work/wheels/tflite_runtime-${TFLITE_VERSION}-${PYTHON_VERSION}-linux_\${ARCH_NAME}.whl\"
               mv \"\$WHEEL_PATH\" \"\$NEW_WHEEL_PATH\"
             "
@@ -174,6 +146,14 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: wheels
+
+      - name: List Downloaded Wheels
+        run: find wheels
+
+      - name: Authenticate GitHub CLI
+        run: gh auth status
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create GitHub Release (if not exists)
         run: |
