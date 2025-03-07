@@ -118,15 +118,18 @@ jobs:
         with:
           path: wheels
 
-      - name: List Downloaded Wheels
-        run: find wheels
+      - name: Normalize Artifact Structure
+        run: |
+          mkdir -p wheels_flat
+          find wheels -type f -name "*.whl" -exec mv {} wheels_flat/ \;
+          ls -l wheels_flat/
 
       - name: Authenticate GitHub CLI
         run: gh auth status
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Create GitHub Release (if not exists)
+      - name: Ensure Release Exists Before Upload
         run: |
           gh release view ${{ env.TFLITE_VERSION }} -R "${{ github.repository }}" > /dev/null 2>&1 || \
           gh release create ${{ env.TFLITE_VERSION }} \
@@ -138,6 +141,6 @@ jobs:
 
       - name: Upload Wheels to GitHub Release
         run: |
-          gh release upload ${{ env.TFLITE_VERSION }} wheels/**/*.whl --clobber -R "${{ github.repository }}"
+          gh release upload ${{ env.TFLITE_VERSION }} wheels_flat/*.whl --clobber -R "${{ github.repository }}"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
