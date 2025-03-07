@@ -18,7 +18,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        arch: [aarch64]
+        arch: [x86_64,aarch64]
         python: ["3.11"]
     steps:
       - name: Check out repository
@@ -29,8 +29,16 @@ jobs:
           echo "Matrix Arch: ${{ matrix.arch }}"
           echo "Matrix Python: ${{ matrix.python }}"
 
-      - name: Cleanup old wheels
-        run: rm -rf wheels/* || true
+      - name: Cleanup old wheels and cache
+        run: |
+          rm -rf wheels/* || true
+          bazel clean --expunge
+          rm -rf ~/.cache/bazel
+
+      - name: Free up Disk Space
+        run: |
+          df -h
+          docker system prune -af
 
       - name: Set up QEMU for ARM Emulation
         run: |
@@ -51,13 +59,11 @@ jobs:
 
           # Set global flags
           GLOBAL_FLAGS=""
-          #GLOBAL_FLAGS="--config=monolithic --copt=-DNDEBUG --copt=-fdata-sections --linkopt=-Wl,--gc-sections --copt=-O3 --copt=-flto --linkopt=-flto --strip=always"
-
+          
           # Set architecture-specific build flags.
           case "$ARCH" in
-            x86_64_noavx) ARCH_FLAG="";;
-            x86_64) ARCH_FLAG="--cpu=aarch64 --config=elinux_aarch64";;
-            aarch64) ARCH_FLAG="--copt=-mno-avx --copt=-mno-avx2 --copt=-msse4.2 --copt=-msse4.1";;
+            x86_64) ARCH_FLAG="--cpu=k8";;
+            aarch64) ARCH_FLAG="--cpu=arm64";;
             *)
               echo "Warning: Unknown architecture '$ARCH'"
               exit 1
@@ -82,28 +88,32 @@ jobs:
               apt-get update
               apt-get install -y build-essential clang git zip unzip pkg-config curl
 
-              # ========== 2) Install Bazelisk ==========
+              # ========== 2) Install Stable Bazel Version ==========
               if [[ \"$ARCH\" == \"aarch64\" ]]; then
-                # Download the Bazelisk binary for arm64.
                 curl -sSL https://github.com/bazelbuild/bazelisk/releases/download/v1.25.0/bazelisk-linux-arm64 -o /usr/local/bin/bazel
               else
                 curl -sSL https://github.com/bazelbuild/bazelisk/releases/download/v1.25.0/bazelisk-linux-amd64 -o /usr/local/bin/bazel
               fi
               chmod +x /usr/local/bin/bazel
 
-              # ========== 3) Create and Activate a Virtual Environment ==========
+              # ========== 3) Set up Bazel Cache Permissions ==========
+              mkdir -p /root/.cache/bazel
+              chown -R $(whoami) /root/.cache/bazel
+              chmod -R u+rw /root/.cache/bazel
+
+              # ========== 4) Create and Activate Virtual Environment ==========
               python -m venv /opt/tflite_env
               source /opt/tflite_env/bin/activate
 
               # Upgrade pip and install required Python packages.
               pip install --upgrade pip wheel numpy auditwheel setuptools
 
-              # ========== 4) Clone TensorFlow v2.17.1 ==========
+              # ========== 5) Clone TensorFlow v2.17.1 ==========
               git clone https://github.com/tensorflow/tensorflow.git
               cd tensorflow
               git checkout tags/v${TFLITE_VERSION}
 
-              # ========== 5) Build TFLite Runtime ==========
+              # ========== 6) Build TFLite Runtime ==========
               export CC=clang
               export TF_PYTHON_VERSION=${PYTHON_VERSION}
               export PYTHON=/opt/tflite_env/bin/python
@@ -113,9 +123,11 @@ jobs:
                 --define=xnnpack_enable_subgraph_reshaping=true \
                 --define=no_tensorflow_py_deps=true \
                 $ARCH_FLAG \
-                $GLOBAL_FLAGS
+                $GLOBAL_FLAGS \
+                --verbose_failures \
+                --jobs=1
 
-              # ========== 6) Locate and Rename the Built Wheel ==========
+              # ========== 7) Locate and Rename the Built Wheel ==========
               mkdir -p /work/wheels
               WHEEL_PATH=\$(find tensorflow/lite/tools/pip_package/gen/tflite_pip/python3/dist -name \"*.whl\" | head -n 1)
 
