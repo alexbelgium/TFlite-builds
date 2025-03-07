@@ -24,10 +24,6 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      # -----------------------------------
-      # NO QEMU! We are cross-compiling natively from x86_64.
-      # -----------------------------------
-
       - name: Run Build in Container
         run: |
           ARCH=${{ matrix.arch }}
@@ -36,16 +32,16 @@ jobs:
           # Use an x86_64 Debian-based container
           DOCKER_IMG="python:${PYTHON_VERSION}-slim-bookworm"
 
-          # Bazel build flags (monolithic, LTO, optimizations)
+          # Global Bazel build flags
           GLOBAL_FLAGS="--config=monolithic \
                         --copt=-DNDEBUG --copt=-fdata-sections --linkopt=-Wl,--gc-sections \
                         --copt=-O3 --copt=-flto --linkopt=-flto --strip=always"
 
-          # Architecture-specific settings
+          # Architecture-specific build flags
           if [[ "$ARCH" == "x86_64" ]]; then
             ARCH_FLAG="--cpu=k8"
           elif [[ "$ARCH" == "aarch64" ]]; then
-            ARCH_FLAG="--cpu=aarch64 --config=elinux_aarch64"
+            ARCH_FLAG="--cpu=aarch64 --config=elinux_aarch64 --crosstool_top=@bazel_tools//tools/cpp:toolchain"
           elif [[ "$ARCH" == "x86_64_noavx" ]]; then
             ARCH_FLAG="--cpu=core2 --copt=-mno-avx --copt=-mno-avx2 --copt=-msse4.2 --copt=-msse4.1"
           else
