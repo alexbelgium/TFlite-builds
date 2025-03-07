@@ -38,11 +38,14 @@ jobs:
           # Use a Bookworm-based image for all Python versions to ensure a recent Clang.
           DOCKER_IMG="python:${PYTHON_VERSION}-slim-bookworm"
 
+          # Set global flags
+          GLOBAL_FLAGS="--config=monolithic --copt=-DNDEBUG --copt=-fdata-sections --linkopt=-Wl,--gc-sections --copt=-O3 --copt=-flto --linkopt=-flto --strip=always"
+
           # Set architecture-specific build flags.
           if [[ "$ARCH" == "x86_64" ]]; then
-            ARCH_FLAG="--cpu=k8 --copt=-flto --linkopt=-flto"
+            ARCH_FLAG="--cpu=k8"
           elif [[ "$ARCH" == "aarch64" ]]; then
-            ARCH_FLAG="--cpu=aarch64 --copt=-flto --linkopt=-flto"
+            ARCH_FLAG="--cpu=aarch64 --config=elinux_aarch64"
           elif [[ "$ARCH" == "x86_64_noavx" ]]; then
             ARCH_FLAG="--cpu=core2 --copt=-mno-avx --copt=-mno-avx2 --copt=-msse4.2 --copt=-msse4.1"
           else
@@ -98,7 +101,8 @@ jobs:
                 --define=tflite_enable_xnnpack=true \
                 --define=xnnpack_enable_subgraph_reshaping=true \
                 --define=no_tensorflow_py_deps=true \
-                $ARCH_FLAG
+                $ARCH_FLAG \
+                $GLOBAL_FLAGS
 
               # ========== 6) Locate and Rename the Built Wheel ==========
               mkdir -p /work/wheels
