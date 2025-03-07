@@ -39,7 +39,8 @@ jobs:
           DOCKER_IMG="python:${PYTHON_VERSION}-slim-bookworm"
 
           # Set global flags
-          GLOBAL_FLAGS="--config=monolithic --copt=-DNDEBUG --copt=-fdata-sections --linkopt=-Wl,--gc-sections --copt=-O3 --copt=-flto --linkopt=-flto --strip=always"
+          GLOBAL_FLAGS=""
+          #GLOBAL_FLAGS="--config=monolithic --copt=-DNDEBUG --copt=-fdata-sections --linkopt=-Wl,--gc-sections --copt=-O3 --copt=-flto --linkopt=-flto --strip=always"
 
           # Set architecture-specific build flags.
           if [[ "$ARCH" == "x86_64" ]]; then
