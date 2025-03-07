@@ -6,12 +6,12 @@ on:
   pull_request:
 
 env:
-  TFLITE_VERSION: "2.19.0-rc0"
-  PYTHON_VERSION: "3.11"  # Change as needed
+  TFLITE_VERSION: "2.17.1"
+  PYTHON_VERSION: "3.11"
 
 jobs:
   build-tflite-runtime:
-    runs-on: ubuntu-latest  # Using Docker to run Debian Bookworm
+    runs-on: ubuntu-latest
     name: Build TFLite Runtime wheels
     strategy:
       fail-fast: false
@@ -67,7 +67,6 @@ jobs:
                 --define=tflite_enable_xnnpack=true \
                 --define=xnnpack_enable_subgraph_reshaping=true \
                 --define=no_tensorflow_py_deps=true \
-                --define=tflite_enable_select_tf_ops=true \
                 ${{ matrix.arch_flag }}
 
               # ========== 5) Locate and Process the Built Wheel ==========
@@ -99,6 +98,19 @@ jobs:
           name: tflite_runtime-${{ env.TFLITE_VERSION }}-${{ matrix.arch }}
           path: wheels/*.whl
 
+  upload-release:
+    needs: build-tflite-runtime
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all built wheels
+        uses: actions/download-artifact@v4
+        with:
+          path: all_wheels
+          merge-multiple: true
+
+      - name: List downloaded wheels
+        run: ls -l all_wheels
+
       - name: Create GitHub Release (if not exists)
         run: |
           gh release view ${{ env.TFLITE_VERSION }} > /dev/null 2>&1 || \
@@ -106,11 +118,10 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Upload Wheels to GitHub Release
+      - name: Upload Both Wheels to GitHub Release
         run: |
-          for file in wheels/*.whl; do
+          for file in all_wheels/*.whl; do
             gh release upload ${{ env.TFLITE_VERSION }} "$file" --clobber
           done
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
