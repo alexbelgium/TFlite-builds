@@ -6,6 +6,6 @@
 - Python versions : 3.9 ; 3.10 ; 3.11 ; 3.12
 
 ## Flags :
-- define=tflite_enable_xnnpack=true
-- define=xnnpack_enable_subgraph_reshaping=true
-- define=no_tensorflow_py_deps=true
+- tflite_enable_xnnpack=true
+- xnnpack_enable_subgraph_reshaping=true
+- no_tensorflow_py_deps=true
