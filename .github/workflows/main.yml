@@ -7,6 +7,7 @@ on:
 
 env:
   TFLITE_VERSION: "2.17.1"
+  PYTHON_VERSION: "3.11"  # Change as needed
 
 jobs:
   build-tflite-runtime:
@@ -15,8 +16,6 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        arch: [x86_64, aarch64]
-        python_version: ["3.10", "3.11", "3.12"]
         include:
           - arch: x86_64
             docker_img: debian:bookworm
@@ -40,17 +39,15 @@ jobs:
 
               # ========== 1) Install System Dependencies ==========
               apt-get update
-              apt-get install -y build-essential clang git zip unzip pkg-config curl \
-                                 python3 python3-pip python3-venv \
-                                 python${{ matrix.python_version }} \
-                                 python${{ matrix.python_version }}-dev
+              apt-get install -y build-essential python${PYTHON_VERSION} python${PYTHON_VERSION}-venv \
+                                 python${PYTHON_VERSION}-dev clang git zip unzip pkg-config curl
 
               # Install Bazelisk (to fetch Bazel automatically)
               curl -sSL https://github.com/bazelbuild/bazelisk/releases/download/v1.17.0/bazelisk-linux-amd64 -o /usr/local/bin/bazel
               chmod +x /usr/local/bin/bazel
 
               # ========== 2) Create and Activate a Virtual Environment ==========
-              python${{ matrix.python_version }} -m venv /opt/tflite_env
+              python${PYTHON_VERSION} -m venv /opt/tflite_env
               source /opt/tflite_env/bin/activate
 
               # Upgrade pip and install required Python packages inside the venv
@@ -63,13 +60,13 @@ jobs:
 
               # ========== 4) Build TFLite Runtime ==========
               export CC=clang
-              export TF_PYTHON_VERSION=${{ matrix.python_version }}
+              export TF_PYTHON_VERSION=${PYTHON_VERSION}
               export PYTHON=/opt/tflite_env/bin/python
 
               ./tensorflow/lite/tools/pip_package/build_pip_package_with_bazel.sh native \
                 --define=tflite_enable_xnnpack=true \
                 --define=xnnpack_enable_subgraph_reshaping=true \
-                --define=no_tensorflow_py_deps=true \
+                --define:no_tensorflow_py_deps=true \
                 --define=tflite_enable_select_tf_ops=true \
                 ${{ matrix.arch_flag }}
 
@@ -99,7 +96,7 @@ jobs:
       - name: Upload Wheel Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: tflite_runtime-${{ env.TFLITE_VERSION }}-${{ matrix.arch }}-py${{ matrix.python_version }}
+          name: tflite_runtime-${{ env.TFLITE_VERSION }}-${{ matrix.arch }}
           path: wheels/*.whl
 
   release:
@@ -107,13 +104,20 @@ jobs:
     needs: build-tflite-runtime
     name: Create and Upload Release
     steps:
-      - name: Download All Built Artifacts
-        uses: actions/download-artifact@v3
+      - name: Download x86_64 Artifact
+        uses: actions/download-artifact@v2
         with:
+          name: tflite_runtime-${{ env.TFLITE_VERSION }}-x86_64
+          path: wheels
+
+      - name: Download aarch64 Artifact
+        uses: actions/download-artifact@v2
+        with:
+          name: tflite_runtime-${{ env.TFLITE_VERSION }}-aarch64
           path: wheels
 
       - name: List Downloaded Wheels
-        run: ls -lR wheels
+        run: ls -l wheels
 
       - name: Create GitHub Release (if not exists)
         run: |
@@ -124,7 +128,7 @@ jobs:
 
       - name: Upload Wheels to GitHub Release
         run: |
-          for file in wheels/**/*.whl; do
+          for file in wheels/*.whl; do
             gh release upload ${{ env.TFLITE_VERSION }} "$file" --clobber
           done
         env:
