@@ -18,7 +18,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        arch: [x86_64,aarch64]
+        arch: [x86_64,x86_64_noavx,aarch64]
         python: ["3.9","3.10","3.11","3.12"]
     steps:
       - name: Check out repository
@@ -67,6 +67,7 @@ jobs:
           # Set architecture-specific build flags.
           case "$ARCH" in
             x86_64) ARCH_FLAG="--cpu=k8";;
+            x86_64_noavx) ARCH_FLAG="--cpu=core2 --copt=-mno-avx --copt=-mno-avx2 --copt=-msse4.2 --copt=-msse4.1";;
             aarch64) ARCH_FLAG="--cpu=aarch64 --config=elinux_aarch64";;
             *)
               echo "Warning: Unknown architecture '$ARCH'"
@@ -76,7 +77,7 @@ jobs:
 
           # Set the Docker platform flag.
           case "$ARCH" in
-            x86_64) PLATFORM_FLAG="--platform=linux/amd64";;
+            x86_64*) PLATFORM_FLAG="--platform=linux/amd64";;
             aarch64) PLATFORM_FLAG="--platform=linux/arm64";;
             *)
               echo "Warning: Unknown architecture '$ARCH'"
@@ -101,7 +102,7 @@ jobs:
 
               # ========== 2) Install Stable Bazel Version ==========
               case \"$ARCH\" in
-                x86_64) curl -sSL https://github.com/bazelbuild/bazelisk/releases/download/v1.25.0/bazelisk-linux-amd64 -o /usr/local/bin/bazel;;
+                x86_64*) curl -sSL https://github.com/bazelbuild/bazelisk/releases/download/v1.25.0/bazelisk-linux-amd64 -o /usr/local/bin/bazel;;
                 aarch64) curl -sSL https://github.com/bazelbuild/bazelisk/releases/download/v1.25.0/bazelisk-linux-arm64 -o /usr/local/bin/bazel;;
                 *)
                   echo \"Warning: Unknown architecture '$ARCH'\"
