@@ -24,6 +24,12 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
+      - name: Debug Matrix
+        run: echo "Matrix: Arch=${{ matrix.arch }}, Python=${{ matrix.python }}"
+
+      - name: Cleanup old wheels
+        run: rm -rf wheels/* || true
+
       - name: Set up QEMU for ARM Emulation
         run: |
           sudo apt-get update
@@ -32,8 +38,11 @@ jobs:
 
       - name: Run Build in Container
         run: |
+          set -eux
           ARCH=${{ matrix.arch }}
           PYTHON_VERSION=${{ matrix.python }}
+
+          echo "Building for architecture: $ARCH"
 
           # Use a Bookworm-based image for all Python versions to ensure a recent Clang.
           DOCKER_IMG="python:${PYTHON_VERSION}-slim-bookworm"
@@ -50,7 +59,7 @@ jobs:
           elif [[ "$ARCH" == "x86_64_noavx" ]]; then
             ARCH_FLAG="--cpu=core2 --copt=-mno-avx --copt=-mno-avx2 --copt=-msse4.2 --copt=-msse4.1"
           else
-            echo \"Unknown architecture: $ARCH\"
+            echo "Unknown architecture: $ARCH"
             exit 1
           fi
 
@@ -133,6 +142,9 @@ jobs:
 
               echo \"Renamed wheel to: \$NEW_WHEEL_PATH\"
             "
+
+      - name: Clean up Docker
+        run: docker system prune -af
 
       - name: List Built Wheels
         run: ls -l wheels
