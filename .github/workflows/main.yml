@@ -42,7 +42,6 @@ jobs:
         run: |
           set -eux
           ARCH="${{ matrix.arch }}"
-          echo "ARCH is $ARCH"
           PYTHON_VERSION=${{ matrix.python }}
 
           echo "Building for architecture: $ARCH"
@@ -56,9 +55,9 @@ jobs:
 
           # Set architecture-specific build flags.
           case "$ARCH" in
-            x86_64_noavx) ARCH_FLAG="--cpu=k8";;
+            x86_64_noavx) ARCH_FLAG="";;
             x86_64) ARCH_FLAG="--cpu=aarch64 --config=elinux_aarch64";;
-            aarch64) ARCH_FLAG="--cpu=core2 --copt=-mno-avx --copt=-mno-avx2 --copt=-msse4.2 --copt=-msse4.1";;
+            aarch64) ARCH_FLAG="--copt=-mno-avx --copt=-mno-avx2 --copt=-msse4.2 --copt=-msse4.1";;
             *)
               echo "Warning: Unknown architecture '$ARCH'"
               exit 1
