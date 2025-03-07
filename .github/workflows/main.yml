@@ -10,6 +10,7 @@ permissions:
 
 env:
   TFLITE_VERSION: "2.17.1"
+  PYTHON_VERSION: "3.11"
 
 jobs:
   build-tflite-runtime:
@@ -18,93 +19,63 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        arch: [x86_64, aarch64, x86_64_noavx]
-        python: ["3.9", "3.10", "3.11", "3.12"]
+        include:
+          - arch: x86_64
+            docker_img: debian:bookworm
+            arch_flag: "--cpu=k8 --copt=-flto --linkopt=-flto"
+          - arch: aarch64
+            docker_img: debian:bookworm
+            arch_flag: "--cpu=aarch64 --copt=-flto --linkopt=-flto"
+          - arch: x86_64_noavx
+            docker_img: debian:bookworm
+            arch_flag: "--cpu=core2 --copt=-mno-avx --copt=-mno-avx2 --copt=-msse4.2 --copt=-msse4.1"
+
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Set up QEMU for ARM Emulation
+      - name: Run Build in Debian Bookworm Container
         run: |
-          sudo apt-get update
-          sudo apt-get install -y qemu-user-static binfmt-support
-          docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
-
-      - name: Run Build in Container
-        run: |
-          ARCH=${{ matrix.arch }}
-          PYTHON_VERSION=${{ matrix.python }}
-
-          DOCKER_IMG="python:${PYTHON_VERSION}-slim-bookworm"
-
-          # Global Bazel flags (added --linkopt=-fuse-ld=lld, you can drop clang if you prefer gcc)
-          GLOBAL_FLAGS="--copt=-O3 --copt=-flto --linkopt=-flto --strip=always"
-
-          if [[ "$ARCH" == "aarch64" ]]; then
-            ARCH_FLAG="--cpu=aarch64 --config=elinux_aarch64"
-            PLATFORM_FLAG="--platform=linux/arm64"
-          elif [[ "$ARCH" == "x86_64" ]]; then
-            ARCH_FLAG="--cpu=k8"
-            PLATFORM_FLAG="--platform=linux/amd64"
-          elif [[ "$ARCH" == "x86_64_noavx" ]]; then
-            ARCH_FLAG="--cpu=core2 --copt=-mno-avx --copt=-mno-avx2 --copt=-msse4.2 --copt=-msse4.1"
-            PLATFORM_FLAG="--platform=linux/amd64"
-          else
-            echo "Unknown architecture: $ARCH"
-            exit 1
-          fi
-
-          docker run --rm --privileged $PLATFORM_FLAG \
+          docker run --rm --privileged \
             -v $PWD:/work \
             -w /work \
-            $DOCKER_IMG \
+            ${{ matrix.docker_img }} \
             bash -c "
               set -eux
+
+              # ========== 1) Install System Dependencies ==========
               apt-get update
-              apt-get install -y \
-                build-essential \
-                clang \
-                git \
-                zip \
-                unzip \
-                pkg-config \
-                curl \
-                zlib1g-dev \
-                lld
+              apt-get install -y build-essential python${PYTHON_VERSION} python${PYTHON_VERSION}-venv \
+                                 python${PYTHON_VERSION}-dev clang git zip unzip pkg-config curl
 
-              # Optionally skip clang for ARM: apt-get remove clang
-              # or just do not export CC=clang below.
-
-              # Install Bazelisk
-              if [[ \"$ARCH\" == \"aarch64\" ]]; then
-                curl -sSL https://github.com/bazelbuild/bazelisk/releases/download/v1.17.0/bazelisk-linux-arm64 -o /usr/local/bin/bazel
-              else
-                curl -sSL https://github.com/bazelbuild/bazelisk/releases/download/v1.17.0/bazelisk-linux-amd64 -o /usr/local/bin/bazel
-              fi
+              # Install Bazelisk (to fetch Bazel automatically)
+              curl -sSL https://github.com/bazelbuild/bazelisk/releases/download/v1.17.0/bazelisk-linux-amd64 -o /usr/local/bin/bazel
               chmod +x /usr/local/bin/bazel
 
-              python -m venv /opt/tflite_env
+              # ========== 2) Create and Activate a Virtual Environment ==========
+              python${PYTHON_VERSION} -m venv /opt/tflite_env
               source /opt/tflite_env/bin/activate
-              pip install --upgrade pip wheel numpy auditwheel setuptools
 
+              # Upgrade pip and install required Python packages inside the venv
+              pip install --upgrade pip wheel numpy auditwheel
+
+              # ========== 3) Clone TensorFlow v2.17.1 ==========
               git clone https://github.com/tensorflow/tensorflow.git
               cd tensorflow
               git checkout tags/v${TFLITE_VERSION}
 
-              # If you really want clang:
+              # ========== 4) Build TFLite Runtime ==========
               export CC=clang
-              export CXX=clang++
-
               export TF_PYTHON_VERSION=${PYTHON_VERSION}
               export PYTHON=/opt/tflite_env/bin/python
 
-              ./tensorflow/lite/tools/pip_package/build_pip_package_with_bazel.sh \
+              ./tensorflow/lite/tools/pip_package/build_pip_package_with_bazel.sh native \
                 --define=tflite_enable_xnnpack=true \
                 --define=xnnpack_enable_subgraph_reshaping=true \
                 --define=no_tensorflow_py_deps=true \
-                ${ARCH_FLAG} \
-                ${GLOBAL_FLAGS}
+                ${{ matrix.arch_flag }}
 
+              # ========== 5) Locate and Rename the Built Wheel ==========
               mkdir -p /work/wheels
               WHEEL_PATH=\$(find tensorflow/lite/tools/pip_package/gen/tflite_pip/python3/dist -name \"*.whl\" | head -n 1)
               if [[ -z \"\$WHEEL_PATH\" ]]; then
