@@ -168,5 +168,3 @@ release:
         gh release upload ${{ env.TFLITE_VERSION }} wheels/**/*.whl --clobber -R "${{ github.repository }}"
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
