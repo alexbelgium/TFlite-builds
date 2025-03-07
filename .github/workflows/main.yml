@@ -25,7 +25,9 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Debug Matrix
-        run: echo "Matrix: Arch=${{ matrix.arch }}, Python=${{ matrix.python }}"
+        run: |
+          echo "Matrix Arch: ${{ matrix.arch }}"
+          echo "Matrix Python: ${{ matrix.python }}"
 
       - name: Cleanup old wheels
         run: rm -rf wheels/* || true
