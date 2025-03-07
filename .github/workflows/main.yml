@@ -101,7 +101,7 @@ jobs:
 
               # ========== 3) Set up Bazel Cache Permissions ==========
               mkdir -p /root/.cache/bazel
-              chown -R $(whoami) /root/.cache/bazel
+              #chown -R $(whoami) /root/.cache/bazel
               chmod -R u+rw /root/.cache/bazel
 
               # ========== 4) Create and Activate Virtual Environment ==========
