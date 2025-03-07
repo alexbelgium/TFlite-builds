@@ -56,13 +56,13 @@ jobs:
           DOCKER_IMG="python:${PYTHON_VERSION}-bookworm"
 
           # Set global flags
-          GLOBAL_FLAGS="--copt=-O3 --copt=-flto --linkopt=-flto --strip=always"
+          GLOBAL_FLAGS="--strip=always"
           
           # Set architecture-specific build flags.
           case "$ARCH" in
             x86_64) ARCH_FLAG="--cpu=k8";;
             x86_64_noavx) ARCH_FLAG="--cpu=core2 --copt=-mno-avx --copt=-mno-avx2 --copt=-msse4.2 --copt=-msse4.1";;
-            aarch64) ARCH_FLAG="--cpu=aarch64 --config=elinux_aarch64";;
+            aarch64) ARCH_FLAG="--config=elinux_aarch64";;
             *)
               echo "Warning: Unknown architecture '$ARCH'"
               exit 1
@@ -140,9 +140,7 @@ jobs:
                 --define=xnnpack_enable_subgraph_reshaping=true \
                 --define=no_tensorflow_py_deps=true \
                 $ARCH_FLAG \
-                $GLOBAL_FLAGS \
-                --verbose_failures \
-                --jobs=1
+                $GLOBAL_FLAGS
 
               # ========== 7) Locate and Rename the Built Wheel ==========
               mkdir -p /work/wheels
