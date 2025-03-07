@@ -41,7 +41,6 @@ jobs:
       - name: Run Build in Container
         run: |
           set -eux
-          ARCH=${{ matrix.arch }}
           echo "ARCH is $ARCH"
           PYTHON_VERSION=${{ matrix.python }}
 
@@ -56,12 +55,12 @@ jobs:
 
           # Set architecture-specific build flags.
           case "$ARCH" in
-            x86_64_noavx) ARCH_NAME="x86_64_noavx" ;;
-            x86_64) ARCH_NAME="x86_64" ;;
-            aarch64) ARCH_NAME="aarch64" ;;
+            x86_64_noavx) ARCH_FLAG="--cpu=k8";;
+            x86_64) ARCH_FLAG="--cpu=aarch64 --config=elinux_aarch64";;
+            aarch64) ARCH_FLAG="--cpu=core2 --copt=-mno-avx --copt=-mno-avx2 --copt=-msse4.2 --copt=-msse4.1";;
             *)
-              echo "Warning: Unknown architecture '$ARCH', setting ARCH_NAME to 'unknown'"
-              ARCH_NAME="unknown"
+              echo "Warning: Unknown architecture '$ARCH'"
+              exit 1
               ;;
           esac
 
@@ -127,19 +126,8 @@ jobs:
 
               echo \"Found wheel: \$WHEEL_PATH\"
 
-              # Determine the correct architecture name.
-              if [[ \"$ARCH\" == \"x86_64_noavx\" ]]; then
-                ARCH_NAME=\"x86_64_noavx\"
-              elif [[ \"$ARCH\" == \"x86_64\" ]]; then
-                ARCH_NAME=\"x86_64\"
-              elif [[ \"$ARCH\" == \"aarch64\" ]]; then
-                ARCH_NAME=\"aarch64\"
-              else
-                ARCH_NAME=\"unknown\"
-              fi
-
               # Generate new filename: tflite_runtime-{TFLITE_VERSION}-{PYTHON_VERSION}-linux_{ARCH}.whl
-              NEW_WHEEL_PATH=\"/work/wheels/tflite_runtime-${TFLITE_VERSION}-${PYTHON_VERSION}-linux_${ARCH_NAME}.whl\"
+              NEW_WHEEL_PATH=\"/work/wheels/tflite_runtime-${TFLITE_VERSION}-${PYTHON_VERSION}-linux_${ARCH}.whl\"
               mv \"\$WHEEL_PATH\" \"\$NEW_WHEEL_PATH\"
 
               echo \"Renamed wheel to: \$NEW_WHEEL_PATH\"
