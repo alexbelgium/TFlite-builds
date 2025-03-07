@@ -19,7 +19,7 @@ jobs:
       fail-fast: false
       matrix:
         arch: [x86_64, aarch64, x86_64_noavx]
-        python: ["3.9", "3.10", "3.11", "3.12"]
+        python: [3.9, 3.10, 3.11, 3.12]
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -34,14 +34,9 @@ jobs:
         run: |
           ARCH=${{ matrix.arch }}
           PYTHON_VERSION=${{ matrix.python }}
-          
-          # Choose the appropriate Docker image based on the Python version.
-          # For 3.9 and 3.10, use the Bullseye-based image; for 3.11 and 3.12, use Bookworm.
-          if [[ "$PYTHON_VERSION" == "3.9" || "$PYTHON_VERSION" == "3.10" ]]; then
-            DOCKER_IMG="python:${PYTHON_VERSION}-slim-bullseye"
-          else
-            DOCKER_IMG="python:${PYTHON_VERSION}-slim-bookworm"
-          fi
+
+          # Use a Bookworm-based image for all Python versions to ensure a recent Clang.
+          DOCKER_IMG="python:${PYTHON_VERSION}-slim-bookworm"
 
           # Set architecture-specific build flags.
           if [[ "$ARCH" == "x86_64" ]]; then
@@ -78,11 +73,11 @@ jobs:
               chmod +x /usr/local/bin/bazel
 
               # ========== 2) Create and Activate a Virtual Environment ==========
-              # The base image already provides the desired Python version.
               python -m venv /opt/tflite_env
               source /opt/tflite_env/bin/activate
 
-              pip install --upgrade pip wheel numpy auditwheel
+              # Upgrade pip and install required Python packages.
+              pip install --upgrade pip wheel numpy auditwheel setuptools
 
               # ========== 3) Clone TensorFlow v2.17.1 ==========
               git clone https://github.com/tensorflow/tensorflow.git
