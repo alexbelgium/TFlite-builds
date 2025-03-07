@@ -59,11 +59,15 @@ jobs:
 
           # Use a Bookworm-based image for all Python versions to ensure a recent Clang.
           DOCKER_IMG="python:${PYTHON_VERSION}-slim-bookworm"
+
+          # Set global flags
+          GLOBAL_FLAGS="--copt=-O3 --copt=-flto --linkopt=-flto --strip=always"
+          #GLOBAL_FLAGS="--config=monolithic --copt=-DNDEBUG --copt=-fdata-sections --linkopt=-Wl,--gc-sections --copt=-O3 --copt=-flto --linkopt=-flto --strip=always"
           
           # Set architecture-specific build flags.
           case "$ARCH" in
             x86_64) ARCH_FLAG="--cpu=k8";;
-            aarch64) ARCH_FLAG="--cpu=arm64";;
+            aarch64) ARCH_FLAG="--cpu=aarch64 --config=elinux_aarch64";;
             *)
               echo "Warning: Unknown architecture '$ARCH'"
               exit 1
@@ -86,6 +90,7 @@ jobs:
             -e ARCH="$ARCH" \
             -e PYTHON_VERSION="$PYTHON_VERSION" \
             -e ARCH_FLAG="$ARCH_FLAG" \
+            -e GLOBAL_FLAGS="$GLOBAL_FLAGS" \
             $DOCKER_IMG \
             bash -c "
               set -eux
@@ -132,6 +137,7 @@ jobs:
                 --define=xnnpack_enable_subgraph_reshaping=true \
                 --define=no_tensorflow_py_deps=true \
                 $ARCH_FLAG \
+                $GLOBAL_FLAGS \
                 --verbose_failures \
                 --jobs=1
 
