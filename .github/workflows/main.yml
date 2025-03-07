@@ -1,4 +1,4 @@
-name: publish-tflite-runtime-wheels
+name: publish-litert-runtime-wheels
 
 on:
   push:
@@ -9,137 +9,125 @@ permissions:
   contents: write  # Ensure GITHUB_TOKEN can create releases
 
 env:
-  TFLITE_VERSION: "2.17.1"
+  LITERT_VERSION: "2.17.1"
+  TOOLCHAIN_DIR: "${{ github.workspace }}/toolchains"
 
 jobs:
-  build-tflite-runtime:
+  build-litert-runtime-x86_64:
     runs-on: ubuntu-latest
-    name: Build TFLite Runtime wheels
+    name: Build LiteRT for x86_64
     strategy:
       fail-fast: false
       matrix:
-        arch: [x86_64, aarch64, x86_64_noavx]
         python: ["3.9", "3.10", "3.11", "3.12"]
+
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Run Build in Container
+      - name: Install Dependencies
         run: |
-          ARCH=${{ matrix.arch }}
-          PYTHON_VERSION=${{ matrix.python }}
-      
-          DOCKER_IMG="python:${PYTHON_VERSION}-slim-bookworm"
+          sudo apt update
+          sudo apt install -y build-essential cmake git zip unzip pkg-config curl python${{ matrix.python }}-dev python${{ matrix.python }}-venv
 
-          # Global Bazel flags (example optimization flags)
-          GLOBAL_FLAGS="--config=monolithic \
-                        --define=no_cuda=true \
-                        --copt=-DNDEBUG --copt=-fdata-sections --linkopt=-Wl,--gc-sections \
-                        --copt=-O3 --copt=-flto --linkopt=-flto --strip=always"
-      
-          if [[ "$ARCH" == "x86_64" ]]; then
-            ARCH_FLAG="--cpu=k8"
-          elif [[ "$ARCH" == "aarch64" ]]; then
-            ARCH_FLAG="--cpu=aarch64 --config=elinux_aarch64"
-          elif [[ "$ARCH" == "x86_64_noavx" ]]; then
-            ARCH_FLAG="--cpu=core2 --copt=-mno-avx --copt=-mno-avx2 --copt=-msse4.2 --copt=-msse4.1"
-          else
-            echo \"Unknown architecture: $ARCH\"
-            exit 1
-          fi
-      
-          docker run --rm \
-            -v $PWD:/work \
-            -w /work \
-            $DOCKER_IMG \
-            bash -c "
-              set -eux
-      
-              # 1) Install Dependencies (native, no ARM-specific packages)
-              apt-get update
-              apt-get install -y \
-                git zip unzip pkg-config curl \
-                build-essential \
-                zlib1g-dev \
-                lld
-      
-              if [ \"$ARCH\" = \"aarch64\" ]; then
-                apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
-              fi
-      
-              # 2) Install Bazelisk (always the x86_64 binary)
-              curl -sSL https://github.com/bazelbuild/bazelisk/releases/download/v1.17.0/bazelisk-linux-amd64 -o /usr/local/bin/bazel
-              chmod +x /usr/local/bin/bazel
-      
-              # 3) Set up Python environment
-              python -m venv /opt/tflite_env
-              source /opt/tflite_env/bin/activate
-              pip install --upgrade pip wheel numpy auditwheel setuptools
-      
-              # 4) Clone TensorFlow and checkout the desired version
-              git clone https://github.com/tensorflow/tensorflow.git
-              cd tensorflow
-              git checkout tags/v${TFLITE_VERSION}
-      
-              # 5) Set Cross-Compile Environment
-              export TF_PYTHON_VERSION=${PYTHON_VERSION}
-              export PYTHON=/opt/tflite_env/bin/python
-      
-              if [ \"$ARCH\" = \"aarch64\" ]; then
-                export CC=aarch64-linux-gnu-gcc
-                export CXX=aarch64-linux-gnu-g++
-                export LDFLAGS=\"-fuse-ld=lld\"
-                # Disable problematic flags for aarch64, e.g., remove -march=native
-              else
-                export CC=gcc
-                export CXX=g++
-              fi
-      
-              export TF_NEED_CUDA=0  # Disable CUDA configuration
-      
-              # 6) Build TFLite Runtime with Bazel
-              ./tensorflow/lite/tools/pip_package/build_pip_package_with_bazel.sh \
-                --define=tflite_enable_xnnpack=true \
-                --define=xnnpack_enable_subgraph_reshaping=true \
-                --define=no_tensorflow_py_deps=true \
-                $ARCH_FLAG \
-                $GLOBAL_FLAGS
-      
-              # 7) Move the resulting wheel
-              mkdir -p /work/wheels
-              WHEEL_PATH=\$(find tensorflow/lite/tools/pip_package/gen/tflite_pip/python3/dist -name \"*.whl\" | head -n 1)
-              if [[ -z \"\$WHEEL_PATH\" ]]; then
-                echo \"Error: No wheel file found!\"
-                exit 1
-              fi
-      
-              if [[ \"$ARCH\" == \"x86_64_noavx\" ]]; then
-                ARCH_NAME=\"x86_64_noavx\"
-              elif [[ \"$ARCH\" == \"x86_64\" ]]; then
-                ARCH_NAME=\"x86_64\"
-              elif [[ \"$ARCH\" == \"aarch64\" ]]; then
-                ARCH_NAME=\"aarch64\"
-              fi
-      
-              NEW_WHEEL_PATH=\"/work/wheels/tflite_runtime-${TFLITE_VERSION}-${PYTHON_VERSION}-linux_\${ARCH_NAME}.whl\"
-              mv \"\$WHEEL_PATH\" \"\$NEW_WHEEL_PATH\"
-            "
-      
-      - name: List Built Wheels
-        run: ls -l wheels
-      
-      - name: Verify Wheel Architectures
-        run: file wheels/*.whl
-      
-      - name: Upload Wheel Artifact
+      - name: Set Up Python Environment
+        run: |
+          python${{ matrix.python }} -m venv /opt/litert_env
+          source /opt/litert_env/bin/activate
+          pip install --upgrade pip wheel numpy setuptools
+
+      - name: Clone LiteRT (TensorFlow Lite)
+        run: |
+          git clone https://github.com/tensorflow/tensorflow.git
+          cd tensorflow
+          git checkout tags/v${LITERT_VERSION}
+
+      - name: Build LiteRT with CMake
+        run: |
+          mkdir -p tensorflow/lite/build
+          cd tensorflow/lite/build
+          cmake .. \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_SYSTEM_NAME=Linux \
+            -DCMAKE_SYSTEM_PROCESSOR=x86_64
+
+          make -j$(nproc)
+
+      - name: Build Python Wheel
+        run: |
+          source /opt/litert_env/bin/activate
+          PYTHON=python${{ matrix.python }} tensorflow/lite/tools/pip_package/build_pip_package_with_cmake.sh x86_64
+
+      - name: Upload x86_64 Wheel
         uses: actions/upload-artifact@v4
         with:
-          name: tflite_runtime-${{ env.TFLITE_VERSION }}-${{ matrix.arch }}-py${{ matrix.python }}
-          path: wheels/*.whl
+          name: litert_runtime-x86_64-py${{ matrix.python }}
+          path: tensorflow/lite/build/*.whl
+
+  build-litert-runtime-aarch64:
+    runs-on: ubuntu-latest
+    name: Cross-Compile LiteRT for aarch64
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.9", "3.10", "3.11", "3.12"]
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install Dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y build-essential cmake git zip unzip pkg-config curl python${{ matrix.python }}-dev python${{ matrix.python }}-venv
+
+      - name: Set Up Cross-Compilation Toolchain
+        run: |
+          mkdir -p ${TOOLCHAIN_DIR}
+          curl -LO https://storage.googleapis.com/mirror.tensorflow.org/developer.arm.com/media/Files/downloads/gnu-a/8.3-2019.03/binrel/gcc-arm-8.3-2019.03-x86_64-aarch64-linux-gnu.tar.xz
+          tar -xf gcc-arm-8.3-2019.03-x86_64-aarch64-linux-gnu.tar.xz -C ${TOOLCHAIN_DIR}
+          echo "TOOLCHAIN_PREFIX=${TOOLCHAIN_DIR}/gcc-arm-8.3-2019.03-x86_64-aarch64-linux-gnu/bin/aarch64-linux-gnu-" >> $GITHUB_ENV
+
+      - name: Set Up Python Environment
+        run: |
+          python${{ matrix.python }} -m venv /opt/litert_env
+          source /opt/litert_env/bin/activate
+          pip install --upgrade pip wheel numpy setuptools
+
+      - name: Clone LiteRT (TensorFlow Lite)
+        run: |
+          git clone https://github.com/tensorflow/tensorflow.git
+          cd tensorflow
+          git checkout tags/v${LITERT_VERSION}
+
+      - name: Build LiteRT with CMake for aarch64
+        run: |
+          mkdir -p tensorflow/lite/build
+          cd tensorflow/lite/build
+          cmake .. \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_SYSTEM_NAME=Linux \
+            -DCMAKE_SYSTEM_PROCESSOR=aarch64 \
+            -DCMAKE_C_COMPILER=${{ env.TOOLCHAIN_PREFIX }}gcc \
+            -DCMAKE_CXX_COMPILER=${{ env.TOOLCHAIN_PREFIX }}g++
+
+          make -j$(nproc)
+
+      - name: Build Python Wheel
+        run: |
+          source /opt/litert_env/bin/activate
+          PYTHON=python${{ matrix.python }} tensorflow/lite/tools/pip_package/build_pip_package_with_cmake.sh aarch64
+
+      - name: Upload aarch64 Wheel
+        uses: actions/upload-artifact@v4
+        with:
+          name: litert_runtime-aarch64-py${{ matrix.python }}
+          path: tensorflow/lite/build/*.whl
 
   release:
     runs-on: ubuntu-latest
-    needs: build-tflite-runtime
+    needs: [build-litert-runtime-x86_64, build-litert-runtime-aarch64]
+    name: Create and Upload Release
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -149,18 +137,26 @@ jobs:
         with:
           path: wheels
 
+      - name: List Downloaded Wheels
+        run: find wheels
+
+      - name: Authenticate GitHub CLI
+        run: gh auth status
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Create GitHub Release (if not exists)
         run: |
-          gh release view ${{ env.TFLITE_VERSION }} -R "${{ github.repository }}" > /dev/null 2>&1 || \
-          gh release create ${{ env.TFLITE_VERSION }} \
+          gh release view ${{ env.LITERT_VERSION }} -R "${{ github.repository }}" > /dev/null 2>&1 || \
+          gh release create ${{ env.LITERT_VERSION }} \
             -R "${{ github.repository }}" \
-            --title "tflite_runtime ${{ env.TFLITE_VERSION }}" \
-            --notes "Automated build for tflite_runtime ${{ env.TFLITE_VERSION }}"
+            --title "LiteRT ${{ env.LITERT_VERSION }}" \
+            --notes "Automated build for LiteRT ${{ env.LITERT_VERSION }}"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload Wheels to GitHub Release
         run: |
-          gh release upload ${{ env.TFLITE_VERSION }} wheels/**/*.whl --clobber -R "${{ github.repository }}"
+          gh release upload ${{ env.LITERT_VERSION }} wheels/**/*.whl --clobber -R "${{ github.repository }}"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
