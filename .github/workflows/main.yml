@@ -36,32 +36,26 @@ jobs:
           # We'll just use a Debian/Bookworm image (x86_64).
           DOCKER_IMG="python:${PYTHON_VERSION}-slim-bookworm"
 
-          # Set global Bazel flags (example optimization flags).
-          GLOBAL_FLAGS="--config=monolithic \
-                        --copt=-DNDEBUG --copt=-fdata-sections --linkopt=-Wl,--gc-sections \
-                        --copt=-O3 --copt=-flto --linkopt=-flto --strip=always"
-
           # ARCH-specific build flags.
           if [[ "$ARCH" == "x86_64" ]]; then
             ARCH_FLAG="--cpu=k8"
           elif [[ "$ARCH" == "aarch64" ]]; then
-            # Specify the ARM toolchain and target configuration
-            ARCH_FLAG="--cpu=aarch64 --config=elinux_aarch64 \
-                       --crosstool_top=@local_config_arm_compiler//:toolchain \
-                       --host_crosstool_top=@bazel_tools//tools/cpp:toolchain"
-            export TF_PYTHON_VERSION=${PYTHON_VERSION}
-            export PYTHON=/opt/tflite_env/bin/python
-            export CC=/usr/bin/aarch64-linux-gnu-gcc
-            export CXX=/usr/bin/aarch64-linux-gnu-g++
-            export LDFLAGS="-fuse-ld=lld"
-            export BAZEL_CXXOPTS="-std=c++17"
-            export BAZEL_LINKOPTS="-fuse-ld=lld"
+            ARCH_FLAG="--cpu=aarch64 \
+                      --config=elinux_aarch64 \
+                      --crosstool_top=@local_config_arm_compiler//:toolchain \
+                      --host_crosstool_top=@bazel_tools//tools/cpp:toolchain \
+                      --platforms=@local_config_platform//:linux_aarch64 \
+                      --host_platform=@local_config_platform//:linux_aarch64"
           elif [[ "$ARCH" == "x86_64_noavx" ]]; then
             ARCH_FLAG="--cpu=core2 --copt=-mno-avx --copt=-mno-avx2 --copt=-msse4.2 --copt=-msse4.1"
           else
             echo "Unknown architecture: $ARCH"
             exit 1
           fi
+          
+          GLOBAL_FLAGS="--distinct_host_configuration=false \
+                        --copt=-DNDEBUG --copt=-fdata-sections --linkopt=-Wl,--gc-sections \
+                        --copt=-O3 --copt=-flto --linkopt=-flto --strip=always"
 
           docker run --rm \
             -v $PWD:/work \
