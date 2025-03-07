@@ -26,7 +26,7 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Run Build in Debian Bookworm Container
         run: |
@@ -66,7 +66,7 @@ jobs:
               ./tensorflow/lite/tools/pip_package/build_pip_package_with_bazel.sh native \
                 --define=tflite_enable_xnnpack=true \
                 --define=xnnpack_enable_subgraph_reshaping=true \
-                --define:no_tensorflow_py_deps=true \
+                --define=no_tensorflow_py_deps=true \
                 --define=tflite_enable_select_tf_ops=true \
                 ${{ matrix.arch_flag }}
 
@@ -104,6 +104,9 @@ jobs:
     needs: build-tflite-runtime
     name: Create and Upload Release
     steps:
+      - name: Check out repository  # This fixes the missing Git repository error!
+        uses: actions/checkout@v4
+
       - name: Download x86_64 Artifact
         uses: actions/download-artifact@v4
         with:
@@ -118,6 +121,11 @@ jobs:
 
       - name: List Downloaded Wheels
         run: ls -l wheels
+
+      - name: Authenticate GitHub CLI
+        run: gh auth status
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create GitHub Release (if not exists)
         run: |
