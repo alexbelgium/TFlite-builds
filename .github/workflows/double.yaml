@@ -12,7 +12,7 @@ env:
   TFLITE_VERSION: "2.17.1"
   PYTHON_VERSION: "3.11"
   DOCKER_IMG_BOOKWORM: "debian:bookworm"
-  DOCKER_IMG_PYTHON: "python:${{ env.PYTHON_VERSION }}-slim-bookworm"
+  DOCKER_IMG_PYTHON: "python:3.11-slim-bookworm"
   BAZELISK_VERSION: "1.25.0"
   GLOBAL_FLAGS: "--copt=-O3 --copt=-flto --linkopt=-flto --strip=always"
 
