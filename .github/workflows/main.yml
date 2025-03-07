@@ -59,9 +59,6 @@ jobs:
 
           # Use a Bookworm-based image for all Python versions to ensure a recent Clang.
           DOCKER_IMG="python:${PYTHON_VERSION}-slim-bookworm"
-
-          # Set global flags
-          GLOBAL_FLAGS=""
           
           # Set architecture-specific build flags.
           case "$ARCH" in
@@ -89,7 +86,6 @@ jobs:
             -e ARCH="$ARCH" \
             -e PYTHON_VERSION="$PYTHON_VERSION" \
             -e ARCH_FLAG="$ARCH_FLAG" \
-            -e GLOBAL_FLAG="$GLOBAL_FLAG" \
             $DOCKER_IMG \
             bash -c "
               set -eux
@@ -136,7 +132,6 @@ jobs:
                 --define=xnnpack_enable_subgraph_reshaping=true \
                 --define=no_tensorflow_py_deps=true \
                 $ARCH_FLAG \
-                $GLOBAL_FLAGS \
                 --verbose_failures \
                 --jobs=1
 
