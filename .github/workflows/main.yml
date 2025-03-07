@@ -1,7 +1,7 @@
-name: publish-tflite-runtime-wheels
+anname: publish-tflite-runtime-wheels
 
 on:
-  push:
+  push:an
     branches: [ "main" ]
   pull_request:
 
@@ -182,4 +182,3 @@ jobs:
           gh release upload ${{ env.TFLITE_VERSION }} wheels/**/*.whl --clobber -R "${{ github.repository }}"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-an
