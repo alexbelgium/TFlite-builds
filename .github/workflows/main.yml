@@ -68,23 +68,28 @@ jobs:
               apt-get update
               apt-get install -y build-essential clang git zip unzip pkg-config curl
 
-              # Install Bazelisk (to fetch Bazel automatically)
-              curl -sSL https://github.com/bazelbuild/bazelisk/releases/download/v1.17.0/bazelisk-linux-amd64 -o /usr/local/bin/bazel
+              # ========== 2) Install Bazelisk ==========
+              if [[ \"$ARCH\" == \"aarch64\" ]]; then
+                # Download the Bazelisk binary for arm64.
+                curl -sSL https://github.com/bazelbuild/bazelisk/releases/download/v1.17.0/bazelisk-linux-arm64 -o /usr/local/bin/bazel
+              else
+                curl -sSL https://github.com/bazelbuild/bazelisk/releases/download/v1.17.0/bazelisk-linux-amd64 -o /usr/local/bin/bazel
+              fi
               chmod +x /usr/local/bin/bazel
 
-              # ========== 2) Create and Activate a Virtual Environment ==========
+              # ========== 3) Create and Activate a Virtual Environment ==========
               python -m venv /opt/tflite_env
               source /opt/tflite_env/bin/activate
 
               # Upgrade pip and install required Python packages.
               pip install --upgrade pip wheel numpy auditwheel setuptools
 
-              # ========== 3) Clone TensorFlow v2.17.1 ==========
+              # ========== 4) Clone TensorFlow v2.17.1 ==========
               git clone https://github.com/tensorflow/tensorflow.git
               cd tensorflow
               git checkout tags/v${TFLITE_VERSION}
 
-              # ========== 4) Build TFLite Runtime ==========
+              # ========== 5) Build TFLite Runtime ==========
               export CC=clang
               export TF_PYTHON_VERSION=${PYTHON_VERSION}
               export PYTHON=/opt/tflite_env/bin/python
@@ -95,7 +100,7 @@ jobs:
                 --define=no_tensorflow_py_deps=true \
                 $ARCH_FLAG
 
-              # ========== 5) Locate and Rename the Built Wheel ==========
+              # ========== 6) Locate and Rename the Built Wheel ==========
               mkdir -p /work/wheels
               WHEEL_PATH=\$(find tensorflow/lite/tools/pip_package/gen/tflite_pip/python3/dist -name \"*.whl\" | head -n 1)
 
