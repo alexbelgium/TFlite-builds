@@ -18,8 +18,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        arch: [x86_64,x86_64_noavx,aarch64]
-        python: ["3.9","3.10","3.11","3.12"]
+        arch: [x86_64, x86_64_noavx, aarch64]
+        python: ["3.9", "3.10", "3.11", "3.12"]
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -29,21 +29,13 @@ jobs:
           echo "Matrix Arch: ${{ matrix.arch }}"
           echo "Matrix Python: ${{ matrix.python }}"
 
-      - name: Cleanup old wheels and cache
-        run: |
-          rm -rf wheels/* || true
-          if [ -d "tensorflow" ]; then
-            cd tensorflow
-            bazel clean --expunge
-          fi
-          rm -rf ~/.cache/bazel
-
       - name: Free up Disk Space
         run: |
           df -h
           docker system prune -af
 
       - name: Set up QEMU for ARM Emulation
+        if: matrix.arch == 'aarch64'
         run: |
           sudo apt-get update
           sudo apt-get install -y qemu-user-static binfmt-support
@@ -53,7 +45,7 @@ jobs:
         run: |
           set -eux
           ARCH="${{ matrix.arch }}"
-          PYTHON_VERSION=${{ matrix.python }}
+          PYTHON_VERSION="${{ matrix.python }}"
 
           echo "Building for architecture: $ARCH"
 
@@ -62,7 +54,6 @@ jobs:
 
           # Set global flags
           GLOBAL_FLAGS="--copt=-O3 --copt=-flto --linkopt=-flto --strip=always"
-          #GLOBAL_FLAGS="--config=monolithic --copt=-DNDEBUG --copt=-fdata-sections --linkopt=-Wl,--gc-sections --copt=-O3 --copt=-flto --linkopt=-flto --strip=always"
           
           # Set architecture-specific build flags.
           case "$ARCH" in
@@ -92,6 +83,7 @@ jobs:
             -e PYTHON_VERSION="$PYTHON_VERSION" \
             -e ARCH_FLAG="$ARCH_FLAG" \
             -e GLOBAL_FLAGS="$GLOBAL_FLAGS" \
+            --memory=8g --cpus=4 \
             $DOCKER_IMG \
             bash -c "
               set -eux
@@ -115,7 +107,6 @@ jobs:
 
               # ========== 3) Set up Bazel Cache Permissions ==========
               mkdir -p /root/.cache/bazel
-              #chown -R $(whoami) /root/.cache/bazel
               chmod -R u+rw /root/.cache/bazel
 
               # ========== 4) Create and Activate Virtual Environment ==========
