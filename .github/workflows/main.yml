@@ -30,27 +30,32 @@ jobs:
           sudo apt-get install -y qemu-user-static binfmt-support
           docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
 
-      - name: Run Build in Debian Bookworm Container
+      - name: Run Build in Container
         run: |
           ARCH=${{ matrix.arch }}
           PYTHON_VERSION=${{ matrix.python }}
           
-          # Set docker image and architecture-specific flags based on ARCH
+          # Choose the appropriate Docker image based on the Python version.
+          # For 3.9 and 3.10, use the Bullseye-based image; for 3.11 and 3.12, use Bookworm.
+          if [[ "$PYTHON_VERSION" == "3.9" || "$PYTHON_VERSION" == "3.10" ]]; then
+            DOCKER_IMG="python:${PYTHON_VERSION}-slim-bullseye"
+          else
+            DOCKER_IMG="python:${PYTHON_VERSION}-slim-bookworm"
+          fi
+
+          # Set architecture-specific build flags.
           if [[ "$ARCH" == "x86_64" ]]; then
-            DOCKER_IMG="debian:bookworm"
             ARCH_FLAG="--cpu=k8 --copt=-flto --linkopt=-flto"
           elif [[ "$ARCH" == "aarch64" ]]; then
-            DOCKER_IMG="debian:bookworm"
             ARCH_FLAG="--cpu=aarch64 --copt=-flto --linkopt=-flto"
           elif [[ "$ARCH" == "x86_64_noavx" ]]; then
-            DOCKER_IMG="debian:bookworm"
             ARCH_FLAG="--cpu=core2 --copt=-mno-avx --copt=-mno-avx2 --copt=-msse4.2 --copt=-msse4.1"
           else
-            echo "Unknown architecture: $ARCH"
+            echo \"Unknown architecture: $ARCH\"
             exit 1
           fi
 
-          # Set platform flag for Docker
+          # Set the Docker platform flag.
           if [[ "$ARCH" == "aarch64" ]]; then
             PLATFORM_FLAG="--platform=linux/arm64"
           else
@@ -66,18 +71,17 @@ jobs:
 
               # ========== 1) Install System Dependencies ==========
               apt-get update
-              apt-get install -y build-essential python${PYTHON_VERSION} python${PYTHON_VERSION}-venv \
-                                 python${PYTHON_VERSION}-dev clang git zip unzip pkg-config curl
+              apt-get install -y build-essential clang git zip unzip pkg-config curl
 
               # Install Bazelisk (to fetch Bazel automatically)
               curl -sSL https://github.com/bazelbuild/bazelisk/releases/download/v1.17.0/bazelisk-linux-amd64 -o /usr/local/bin/bazel
               chmod +x /usr/local/bin/bazel
 
               # ========== 2) Create and Activate a Virtual Environment ==========
-              python${PYTHON_VERSION} -m venv /opt/tflite_env
+              # The base image already provides the desired Python version.
+              python -m venv /opt/tflite_env
               source /opt/tflite_env/bin/activate
 
-              # Upgrade pip and install required Python packages inside the venv
               pip install --upgrade pip wheel numpy auditwheel
 
               # ========== 3) Clone TensorFlow v2.17.1 ==========
@@ -107,7 +111,7 @@ jobs:
 
               echo \"Found wheel: \$WHEEL_PATH\"
 
-              # Determine correct architecture name
+              # Determine the correct architecture name.
               if [[ \"$ARCH\" == \"x86_64_noavx\" ]]; then
                 ARCH_NAME=\"linux_x86_64_noavx\"
               elif [[ \"$ARCH\" == \"x86_64\" ]]; then
@@ -118,7 +122,7 @@ jobs:
                 ARCH_NAME=\"unknown\"
               fi
 
-              # Append Python version to the wheel name
+              # Append Python version to the wheel name.
               NEW_WHEEL_PATH=\"/work/wheels/\$(basename \"\$WHEEL_PATH\" .whl)-\${ARCH_NAME}-py${PYTHON_VERSION}.whl\"
               mv \"\$WHEEL_PATH\" \"\$NEW_WHEEL_PATH\"
 
