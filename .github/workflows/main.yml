@@ -53,7 +53,7 @@ jobs:
           echo "Building for architecture: $ARCH"
 
           # Use a Bookworm-based image for all Python versions to ensure a recent Clang.
-          DOCKER_IMG="python:${PYTHON_VERSION}-slim-bookworm"
+          DOCKER_IMG="python:${PYTHON_VERSION}-bookworm"
 
           # Set global flags
           GLOBAL_FLAGS="--copt=-O3 --copt=-flto --linkopt=-flto --strip=always"
