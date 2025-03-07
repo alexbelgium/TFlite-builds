@@ -5,9 +5,15 @@
 - Architectures : x86_64 ; aarch64 ; x86_64_non_avx
 - Python versions : 3.9 ; 3.10 ; 3.11 ; 3.12
 
-## Build flags
+## Flags : architecture specific
 
-### General
+| Name of Flag                                | What Does It Do?                                                                 | Impact on TFLite Performance                          | Impact on TFLite Runtime Size                        | Architecture                |
+|---------------------------------------------|----------------------------------------------------------------------------------|------------------------------------------------------|-----------------------------------------------------|-----------------------------|
+| `--cpu=k8`                                  | Specifies the CPU architecture for x86_64.                                       | No direct impact.                                     | No direct impact.                                    | x86_64                      |
+| `--cpu=aarch64 --config=elinux_aarch64`     | Specifies the CPU architecture and configuration for aarch64.                    | No direct impact.                                     | No direct impact.                                    | aarch64                     |
+| `--cpu=core2 --copt=-mno-avx --copt=-mno-avx2 --copt=-msse4.2 --copt=-msse4.1` | Specifies the CPU architecture for x86_64 without AVX support. | No direct impact.                                     | No direct impact.                                    | x86_64_noavx                |
+
+## Flags : general
 
 | Name of Flag                                | What Does It Do?                                                                 | Impact on TFLite Performance                          | Impact on TFLite Runtime Size                        | Architecture                |
 |---------------------------------------------|----------------------------------------------------------------------------------|------------------------------------------------------|-----------------------------------------------------|-----------------------------|
@@ -22,11 +28,3 @@
 | `--copt=-flto`                              | Enables link-time optimization.                                                  | Improves performance.                                 | May increase binary size.                            | All                         |
 | `--linkopt=-flto`                           | Enables link-time optimization during linking.                                   | Improves performance.                                 | May increase binary size.                            | All                         |
 | `--strip=always`                            | Strips all symbols from the binary.                                              | No direct impact.                                     | Significantly reduces binary size.                   | All                         |
-
-### Architecture specific
-
-| Name of Flag                                | What Does It Do?                                                                 | Impact on TFLite Performance                          | Impact on TFLite Runtime Size                        | Architecture                |
-|---------------------------------------------|----------------------------------------------------------------------------------|------------------------------------------------------|-----------------------------------------------------|-----------------------------|
-| `--cpu=k8`                                  | Specifies the CPU architecture for x86_64.                                       | No direct impact.                                     | No direct impact.                                    | x86_64                      |
-| `--cpu=aarch64 --config=elinux_aarch64`     | Specifies the CPU architecture and configuration for aarch64.                    | No direct impact.                                     | No direct impact.                                    | aarch64                     |
-| `--cpu=core2 --copt=-mno-avx --copt=-mno-avx2 --copt=-msse4.2 --copt=-msse4.1` | Specifies the CPU architecture for x86_64 without AVX support. | No direct impact.                                     | No direct impact.                                    | x86_64_noavx                |
