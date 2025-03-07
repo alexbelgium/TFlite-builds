@@ -9,40 +9,14 @@ env:
   TFLITE_VERSION: "2.17.1"
 
 jobs:
-  build-tflite-runtime-py:
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        python_version: [3.10, 3.11, 3.12]
-
-    steps:
-      - name: Set Up Python Version Environment
-        run: echo "PYTHON_VERSION=${{ matrix.python_version }}" >> $GITHUB_ENV
-
-      - name: Trigger Architecture Builds
-        uses: actions/github-script@v7
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            await github.rest.actions.createWorkflowDispatch({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              workflow_id: "publish-tflite-runtime-wheels.yml",
-              ref: context.ref,
-              inputs: {
-                python_version: "${{ matrix.python_version }}"
-              }
-            });
-
   build-tflite-runtime:
     runs-on: ubuntu-latest
-    needs: build-tflite-runtime-py
+    name: Build TFLite Runtime wheels
     strategy:
       fail-fast: false
       matrix:
         arch: [x86_64, aarch64]
-        python_version: [3.10, 3.11, 3.12]
+        python_version: ["3.10", "3.11", "3.12"]
         include:
           - arch: x86_64
             docker_img: debian:bookworm
@@ -66,8 +40,10 @@ jobs:
 
               # ========== 1) Install System Dependencies ==========
               apt-get update
-              apt-get install -y build-essential python${{ matrix.python_version }} python${{ matrix.python_version }}-venv \
-                                 python${{ matrix.python_version }}-dev clang git zip unzip pkg-config curl
+              apt-get install -y build-essential clang git zip unzip pkg-config curl \
+                                 python3 python3-pip python3-venv \
+                                 python${{ matrix.python_version }} \
+                                 python${{ matrix.python_version }}-dev
 
               # Install Bazelisk (to fetch Bazel automatically)
               curl -sSL https://github.com/bazelbuild/bazelisk/releases/download/v1.17.0/bazelisk-linux-amd64 -o /usr/local/bin/bazel
