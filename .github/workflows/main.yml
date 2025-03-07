@@ -6,25 +6,25 @@ on:
   pull_request:
 
 permissions:
-  contents: write
+  contents: write  # Ensure GITHUB_TOKEN can create releases
 
 env:
   TFLITE_VERSION: "2.17.1"
+  PYTHON_VERSION: "3.11"
 
 jobs:
   build-tflite-runtime:
     runs-on: ubuntu-latest
+    name: Build TFLite Runtime wheels
     strategy:
       fail-fast: false
       matrix:
-        arch: [x86_64, aarch64, x86_64_noavx]
-        python_version: ["3.9", "3.10", "3.11", "3.12"]
         include:
           - arch: x86_64
             docker_img: debian:bookworm
             arch_flag: "--cpu=k8 --copt=-flto --linkopt=-flto"
           - arch: aarch64
-            docker_img: debian:bookworm
+            docker_img: arm64v8/debian:bookworm
             arch_flag: "--cpu=aarch64 --copt=-flto --linkopt=-flto"
           - arch: x86_64_noavx
             docker_img: debian:bookworm
@@ -43,37 +43,30 @@ jobs:
             bash -c "
               set -eux
 
-              # ========= Install Dependencies =========
+              # ========== 1) Install System Dependencies ==========
               apt-get update
-              apt-get install -y build-essential wget libssl-dev libffi-dev zlib1g-dev libbz2-dev \
-                                 libreadline-dev libsqlite3-dev clang git zip unzip pkg-config curl
+              apt-get install -y build-essential python${PYTHON_VERSION} python${PYTHON_VERSION}-venv \
+                                 python${PYTHON_VERSION}-dev clang git zip unzip pkg-config curl
 
-              # ========= Download and Build Python if not available =========
-              PYTHON_DIR=\"/opt/python${{ matrix.python_version }}\"
-              if [ ! -x \"\$PYTHON_DIR/bin/python\" ]; then
-                wget https://www.python.org/ftp/python/${{ matrix.python_version }}/Python-${{ matrix.python_version }}.tgz
-                tar -xf Python-${{ matrix.python_version }}.tgz
-                cd Python-${{ matrix.python_version }}
-                ./configure --prefix=\$PYTHON_DIR --enable-optimizations
-                make -j\$(nproc)
-                make install
-                cd ..
-              fi
-              export PYTHON=\$PYTHON_DIR/bin/python
+              # Install Bazelisk (to fetch Bazel automatically)
+              curl -sSL https://github.com/bazelbuild/bazelisk/releases/download/v1.17.0/bazelisk-linux-amd64 -o /usr/local/bin/bazel
+              chmod +x /usr/local/bin/bazel
 
-              # ========= Create and Activate Virtual Environment =========
-              \$PYTHON -m venv /opt/tflite_env
+              # ========== 2) Create and Activate a Virtual Environment ==========
+              python${PYTHON_VERSION} -m venv /opt/tflite_env
               source /opt/tflite_env/bin/activate
+
+              # Upgrade pip and install required Python packages inside the venv
               pip install --upgrade pip wheel numpy auditwheel
 
-              # ========= Clone TensorFlow v2.17.1 =========
+              # ========== 3) Clone TensorFlow v2.17.1 ==========
               git clone https://github.com/tensorflow/tensorflow.git
               cd tensorflow
               git checkout tags/v${TFLITE_VERSION}
 
-              # ========= Build TFLite Runtime =========
+              # ========== 4) Build TFLite Runtime ==========
               export CC=clang
-              export TF_PYTHON_VERSION=${{ matrix.python_version }}
+              export TF_PYTHON_VERSION=${PYTHON_VERSION}
               export PYTHON=/opt/tflite_env/bin/python
 
               ./tensorflow/lite/tools/pip_package/build_pip_package_with_bazel.sh native \
@@ -82,17 +75,30 @@ jobs:
                 --define=no_tensorflow_py_deps=true \
                 ${{ matrix.arch_flag }}
 
-              # ========= Rename the Built Wheel =========
+              # ========== 5) Locate and Rename the Built Wheel ==========
               mkdir -p /work/wheels
               WHEEL_PATH=\$(find tensorflow/lite/tools/pip_package/gen/tflite_pip/python3/dist -name \"*.whl\" | head -n 1)
+
               if [[ -z \"\$WHEEL_PATH\" ]]; then
                 echo \"Error: No wheel file found!\"
                 exit 1
               fi
+
               echo \"Found wheel: \$WHEEL_PATH\"
 
-              # Ensure unique filename
-              NEW_WHEEL_PATH=\"/work/wheels/\$(basename \"\$WHEEL_PATH\" .whl)-${{ matrix.arch }}-py${{ matrix.python_version }}.whl\"
+              # Determine correct architecture name
+              if [[ \"${{ matrix.arch }}\" == \"x86_64_noavx\" ]]; then
+                ARCH_NAME=\"linux_x86_64_noavx\"
+              elif [[ \"${{ matrix.arch }}\" == \"x86_64\" ]]; then
+                ARCH_NAME=\"linux_x86_64\"
+              elif [[ \"${{ matrix.arch }}\" == \"aarch64\" ]]; then
+                ARCH_NAME=\"linux_aarch64\"
+              else
+                ARCH_NAME=\"unknown\"
+              fi
+
+              # Rename the wheel with the correct architecture
+              NEW_WHEEL_PATH=\"/work/wheels/\$(basename \"\$WHEEL_PATH\" .whl)-\${ARCH_NAME}.whl\"
               mv \"\$WHEEL_PATH\" \"\$NEW_WHEEL_PATH\"
 
               echo \"Renamed wheel to: \$NEW_WHEEL_PATH\"
@@ -104,12 +110,13 @@ jobs:
       - name: Upload Wheel Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: tflite_runtime-${{ env.TFLITE_VERSION }}-${{ matrix.arch }}-py${{ matrix.python_version }}
+          name: tflite_runtime-${{ env.TFLITE_VERSION }}-${{ matrix.arch }}
           path: wheels/*.whl
 
   release:
     runs-on: ubuntu-latest
     needs: build-tflite-runtime
+    name: Create and Upload Release
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
