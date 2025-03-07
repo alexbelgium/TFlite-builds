@@ -96,6 +96,8 @@ jobs:
             bash -c "
               set -eux
 
+              echo \"STARTING BUILD : arch $ARCH python $PYTHON_VERSION with flags $ARCH_FLAG $GLOBAL_FLAGS\"
+
               # ========== 1) Install System Dependencies ==========
               apt-get update
               apt-get install -y build-essential clang git zip unzip pkg-config curl python3-pygments python3-pkg-resources
