@@ -1,11 +1,12 @@
 # TFlite-builds
 
-## Builds :
+## TFlite runtimes
 - Base : Debian bookworm
 - Architectures : x86_64 ; aarch64 ; x86_64_non_avx
 - Python versions : 3.9 ; 3.10 ; 3.11 ; 3.12
 
-## Flags :
+## Build flags
+
 | Name of Flag                                | What Does It Do?                                                                 | Impact on TFLite Performance                          | Impact on TFLite Runtime Size                        |
 |---------------------------------------------|----------------------------------------------------------------------------------|------------------------------------------------------|-----------------------------------------------------|
 | `--define=tflite_enable_xnnpack=true`       | Enables XNNPACK, a highly optimized library for neural network inference.        | Improves performance for floating-point models.       | Slight increase in binary size.                     |
