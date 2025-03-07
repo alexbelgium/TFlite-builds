@@ -24,7 +24,7 @@ jobs:
             docker_img: debian:bookworm
             arch_flag: "--cpu=k8 --copt=-flto --linkopt=-flto"
           - arch: aarch64
-            docker_img: arm64v8/debian:bookworm
+            docker_img: debian:bookworm
             arch_flag: "--cpu=aarch64 --copt=-flto --linkopt=-flto"
           - arch: x86_64_noavx
             docker_img: debian:bookworm
@@ -34,12 +34,27 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
+      - name: Set up QEMU for ARM Emulation
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y qemu-user-static binfmt-support
+          docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
+
       - name: Run Build in Debian Bookworm Container
         run: |
-          docker run --rm --privileged \
+          ARCH=${{ matrix.arch }}
+          DOCKER_IMG=${{ matrix.docker_img }}
+
+          if [[ "$ARCH" == "aarch64" ]]; then
+            PLATFORM_FLAG="--platform=linux/arm64"
+          else
+            PLATFORM_FLAG="--platform=linux/amd64"
+          fi
+
+          docker run --rm --privileged $PLATFORM_FLAG \
             -v $PWD:/work \
             -w /work \
-            ${{ matrix.docker_img }} \
+            $DOCKER_IMG \
             bash -c "
               set -eux
 
@@ -87,11 +102,11 @@ jobs:
               echo \"Found wheel: \$WHEEL_PATH\"
 
               # Determine correct architecture name
-              if [[ \"${{ matrix.arch }}\" == \"x86_64_noavx\" ]]; then
+              if [[ \"$ARCH\" == \"x86_64_noavx\" ]]; then
                 ARCH_NAME=\"linux_x86_64_noavx\"
-              elif [[ \"${{ matrix.arch }}\" == \"x86_64\" ]]; then
+              elif [[ \"$ARCH\" == \"x86_64\" ]]; then
                 ARCH_NAME=\"linux_x86_64\"
-              elif [[ \"${{ matrix.arch }}\" == \"aarch64\" ]]; then
+              elif [[ \"$ARCH\" == \"aarch64\" ]]; then
                 ARCH_NAME=\"linux_aarch64\"
               else
                 ARCH_NAME=\"unknown\"
@@ -106,6 +121,9 @@ jobs:
 
       - name: List Built Wheels
         run: ls -l wheels
+
+      - name: Verify Wheel Architectures
+        run: file wheels/*.whl
 
       - name: Upload Wheel Artifact
         uses: actions/upload-artifact@v4
