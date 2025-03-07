@@ -7,6 +7,7 @@ on:
 
 env:
   TFLITE_VERSION: "2.17.1"
+  PYTHON_VERSIONS: "3.10 3.11 3.12"
 
 jobs:
   build-tflite-runtime:
@@ -16,7 +17,7 @@ jobs:
       fail-fast: false
       matrix:
         arch: [x86_64, aarch64]
-        python_version: ["3.9", "3.10", "3.11", "3.12"]
+        python_version: [3.10, 3.11, 3.12]
         include:
           - arch: x86_64
             docker_img: debian:bookworm
@@ -100,18 +101,18 @@ jobs:
           name: tflite_runtime-${{ env.TFLITE_VERSION }}-${{ matrix.arch }}-py${{ matrix.python_version }}
           path: wheels/*.whl
 
-  upload-release:
+  release:
     runs-on: ubuntu-latest
-    needs: build-tflite-runtime  # Ensures all builds finish before uploading
+    needs: build-tflite-runtime
+    name: Create and Upload Release
     steps:
-      - name: Download all wheel artifacts
-        uses: actions/download-artifact@v4
+      - name: Download All Built Artifacts
+        uses: actions/download-artifact@v3
         with:
-          path: all_wheels
-          merge-multiple: true  # Ensures all architectures & Python versions are merged
+          path: wheels
 
-      - name: Debug Downloaded Files
-        run: ls -lR all_wheels  # Confirm all built wheels exist
+      - name: List Downloaded Wheels
+        run: ls -lR wheels
 
       - name: Create GitHub Release (if not exists)
         run: |
@@ -120,10 +121,9 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Upload All Wheels to GitHub Release
+      - name: Upload Wheels to GitHub Release
         run: |
-          for file in all_wheels/**/*.whl; do
-            echo "Uploading: $file"
+          for file in wheels/**/*.whl; do
             gh release upload ${{ env.TFLITE_VERSION }} "$file" --clobber
           done
         env:
