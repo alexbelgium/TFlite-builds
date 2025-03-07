@@ -41,6 +41,7 @@ jobs:
       - name: Run Build in Container
         run: |
           set -eux
+          ARCH="${{ matrix.arch }}"
           echo "ARCH is $ARCH"
           PYTHON_VERSION=${{ matrix.python }}
 
