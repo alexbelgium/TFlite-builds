@@ -1,179 +1,58 @@
-name: publish-tflite-runtime-wheels
-
-on:
-  push:
-    branches: [ "main" ]
-  pull_request:
-
-permissions:
-  contents: write  # Ensure GITHUB_TOKEN can create releases
-
-env:
-  TFLITE_VERSION: "2.17.1"
+name: Build-TFLite-Runtime
+on: [push]
 
 jobs:
-  build-tflite-runtime:
+  build-tflite:
     runs-on: ubuntu-latest
-    name: Build TFLite Runtime wheels
     strategy:
-      fail-fast: false
       matrix:
-        arch: [x86_64, aarch64, x86_64_noavx]
-        python: ["3.9", "3.10", "3.11", "3.12"]
+        arch: [arm64, amd64]  # Build for both ARM64 and x86_64
+    env:
+      TENSORFLOW_VERSION: "2.13.0"
     steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
+      - name: Checkout source
+        uses: actions/checkout@v3
 
-      - name: Set up QEMU for ARM Emulation
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y qemu-user-static binfmt-support
-          docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
+      - name: Install build dependencies
+        run: sudo apt-get update && sudo apt-get install -y build-essential openjdk-11-jdk python3-dev swig git
 
-      - name: Run Build in Container
-        run: |
-          ARCH=${{ matrix.arch }}
-          PYTHON_VERSION=${{ matrix.python }}
-
-          # Use a Bookworm-based image for all Python versions to ensure a recent Clang.
-          DOCKER_IMG="python:${PYTHON_VERSION}-slim-bookworm"
-
-          # Set architecture-specific build flags.
-          if [[ "$ARCH" == "x86_64" ]]; then
-            ARCH_FLAG="--cpu=k8 --copt=-flto --linkopt=-flto"
-          elif [[ "$ARCH" == "aarch64" ]]; then
-            ARCH_FLAG="--cpu=aarch64 --copt=-flto --linkopt=-flto"
-          elif [[ "$ARCH" == "x86_64_noavx" ]]; then
-            ARCH_FLAG="--cpu=core2 --copt=-mno-avx --copt=-mno-avx2 --copt=-msse4.2 --copt=-msse4.1"
-          else
-            echo \"Unknown architecture: $ARCH\"
-            exit 1
-          fi
-
-          # Set the Docker platform flag.
-          if [[ "$ARCH" == "aarch64" ]]; then
-            PLATFORM_FLAG="--platform=linux/arm64"
-          else
-            PLATFORM_FLAG="--platform=linux/amd64"
-          fi
-
-          docker run --rm --privileged $PLATFORM_FLAG \
-            -v $PWD:/work \
-            -w /work \
-            $DOCKER_IMG \
-            bash -c "
-              set -eux
-
-              # ========== 1) Install System Dependencies ==========
-              apt-get update
-              apt-get install -y build-essential clang git zip unzip pkg-config curl
-
-              # ========== 2) Install Bazelisk ==========
-              if [[ \"$ARCH\" == \"aarch64\" ]]; then
-                # Download the Bazelisk binary for arm64.
-                curl -sSL https://github.com/bazelbuild/bazelisk/releases/download/v1.17.0/bazelisk-linux-arm64 -o /usr/local/bin/bazel
-              else
-                curl -sSL https://github.com/bazelbuild/bazelisk/releases/download/v1.17.0/bazelisk-linux-amd64 -o /usr/local/bin/bazel
-              fi
-              chmod +x /usr/local/bin/bazel
-
-              # ========== 3) Create and Activate a Virtual Environment ==========
-              python -m venv /opt/tflite_env
-              source /opt/tflite_env/bin/activate
-
-              # Upgrade pip and install required Python packages.
-              pip install --upgrade pip wheel numpy auditwheel setuptools
-
-              # ========== 4) Clone TensorFlow v2.17.1 ==========
-              git clone https://github.com/tensorflow/tensorflow.git
-              cd tensorflow
-              git checkout tags/v${TFLITE_VERSION}
-
-              # ========== 5) Build TFLite Runtime ==========
-              export CC=clang
-              export TF_PYTHON_VERSION=${PYTHON_VERSION}
-              export PYTHON=/opt/tflite_env/bin/python
-
-              ./tensorflow/lite/tools/pip_package/build_pip_package_with_bazel.sh native \
-                --define=tflite_enable_xnnpack=true \
-                --define=xnnpack_enable_subgraph_reshaping=true \
-                --define=no_tensorflow_py_deps=true \
-                $ARCH_FLAG
-
-              # ========== 6) Locate and Rename the Built Wheel ==========
-              mkdir -p /work/wheels
-              WHEEL_PATH=\$(find tensorflow/lite/tools/pip_package/gen/tflite_pip/python3/dist -name \"*.whl\" | head -n 1)
-
-              if [[ -z \"\$WHEEL_PATH\" ]]; then
-                echo \"Error: No wheel file found!\"
-                exit 1
-              fi
-
-              echo \"Found wheel: \$WHEEL_PATH\"
-
-              # Determine the correct architecture name.
-              if [[ \"$ARCH\" == \"x86_64_noavx\" ]]; then
-                ARCH_NAME=\"x86_64_noavx\"
-              elif [[ \"$ARCH\" == \"x86_64\" ]]; then
-                ARCH_NAME=\"x86_64\"
-              elif [[ \"$ARCH\" == \"aarch64\" ]]; then
-                ARCH_NAME=\"aarch64\"
-              else
-                ARCH_NAME=\"unknown\"
-              fi
-
-              # Generate new filename: tflite_runtime-{TFLITE_VERSION}-{PYTHON_VERSION}-linux_{ARCH}.whl
-              NEW_WHEEL_PATH=\"/work/wheels/tflite_runtime-${TFLITE_VERSION}-${PYTHON_VERSION}-linux_${ARCH_NAME}.whl\"
-              mv \"\$WHEEL_PATH\" \"\$NEW_WHEEL_PATH\"
-
-              echo \"Renamed wheel to: \$NEW_WHEEL_PATH\"
-            "
-
-      - name: List Built Wheels
-        run: ls -l wheels
-
-      - name: Verify Wheel Architectures
-        run: file wheels/*.whl
-
-      - name: Upload Wheel Artifact
-        uses: actions/upload-artifact@v4
+      - name: Setup Bazel
+        uses: bazelbuild/setup-bazel@v1
         with:
-          name: tflite_runtime-${{ env.TFLITE_VERSION }}-${{ matrix.arch }}-py${{ matrix.python }}
-          path: wheels/*.whl
+          bazel-version: "6.1.1"
 
-  release:
-    runs-on: ubuntu-latest
-    needs: build-tflite-runtime
-    name: Create and Upload Release
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
+      - name: Fetch TensorFlow Source
+        run: git clone --depth 1 -b v${TENSORFLOW_VERSION} https://github.com/tensorflow/tensorflow.git
 
-      - name: Download All Artifacts
-        uses: actions/download-artifact@v4
+      - name: Generate selective ops header (BirdNET model)
+        run: |
+          # Download or provide the BirdNET TFLite model file before this step.
+          python tensorflow/tensorflow/lite/tools/optimize/print_selective_registration_header.py \
+            --input_tflite_files=BirdNET_model.tflite > tensorflow/tensorflow/lite/ops_to_register.h
+
+      - name: Build TFLite Runtime
+        working-directory: tensorflow
+        env:
+          # Set architecture-specific Bazel config if needed (for cross-compiling)
+          TARGET_ARCH: ${{ matrix.arch }}
+        run: |
+          # If cross-compiling on x86 host for ARM64, load proper config
+          if [ "$TARGET_ARCH" == "arm64" ]; then 
+            ARCH_CONFIG="--config=elinux_aarch64"
+          else 
+            ARCH_CONFIG=""
+          fi
+          # Build the TFLite C++ library with selective ops and XNNPACK
+          bazel build -c opt --define=tflite_with_xnnpack=true --config=monolithic $ARCH_CONFIG \
+            --copt=-O3 --copt=-DNDEBUG --copt=-fdata-sections --linkopt=-Wl,--gc-sections \
+            //tensorflow/lite:libtensorflowlite.so
+          # Build the Python wheel package for tflite_runtime
+          bazel build -c opt $ARCH_CONFIG //tensorflow/lite/python:tflite_runtime
+          # Copy out the wheel file
+          cp bazel-bin/tensorflow/lite/python/tflite_runtime-*.whl ../tflite_runtime_${TARGET_ARCH}.whl
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
         with:
-          path: wheels
-
-      - name: List Downloaded Wheels
-        run: find wheels
-
-      - name: Authenticate GitHub CLI
-        run: gh auth status
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Create GitHub Release (if not exists)
-        run: |
-          gh release view ${{ env.TFLITE_VERSION }} -R "${{ github.repository }}" > /dev/null 2>&1 || \
-          gh release create ${{ env.TFLITE_VERSION }} \
-            -R "${{ github.repository }}" \
-            --title "tflite_runtime ${{ env.TFLITE_VERSION }}" \
-            --notes "Automated build for tflite_runtime ${{ env.TFLITE_VERSION }}"
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Upload Wheels to GitHub Release
-        run: |
-          gh release upload ${{ env.TFLITE_VERSION }} wheels/**/*.whl --clobber -R "${{ github.repository }}"
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          name: tflite_runtime_${{ matrix.arch }}
+          path: tflite_runtime_${{ matrix.arch }}.whl
