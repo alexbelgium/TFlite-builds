@@ -25,7 +25,7 @@ jobs:
             arch_flag: "--cpu=k8 --copt=-flto --linkopt=-flto"
           - arch: aarch64
             docker_img: debian:bookworm
-            arch_flag: "--cpu=aarch64 --copt=-flto --linkopt=-flto"
+            arch_flag: "--config=elinux_aarch64 --cpu=aarch64 --copt=-flto --linkopt=-flto"
           - arch: x86_64_noavx
             docker_img: debian:bookworm
             arch_flag: "--cpu=core2 --copt=-mno-avx --copt=-mno-avx2 --copt=-msse4.2 --copt=-msse4.1"
