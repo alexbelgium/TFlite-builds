@@ -20,3 +20,5 @@
 | `--copt=-flto`                              | Enables link-time optimization.                                                  | Improves performance.                                 | May increase binary size.                            |
 | `--linkopt=-flto`                           | Enables link-time optimization during linking.                                   | Improves performance.                                 | May increase binary size.                            |
 | `--strip=always`                            | Strips all symbols from the binary.                                              | No direct impact.                                     | Significantly reduces binary size.                   |
+| `--cpu=k8`                                  | Sets the target CPU architecture to k8 (x86_64).                                 | Optimizes performance for x86_64 architecture.        | No direct impact.                                    |
+| `--copt=-march=native`                      | Generates code optimized for the host machine's
