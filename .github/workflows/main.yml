@@ -35,29 +35,26 @@ jobs:
           ARCH=${{ matrix.arch }}
           PYTHON_VERSION=${{ matrix.python }}
 
-          # Use a Bookworm-based image for all Python versions to ensure a recent Clang.
           DOCKER_IMG="python:${PYTHON_VERSION}-slim-bookworm"
 
-          # Set global flags
-          GLOBAL_FLAGS="--config=monolithic --copt=-DNDEBUG --copt=-fdata-sections --linkopt=-Wl,--gc-sections --copt=-O3 --copt=-flto --linkopt=-flto --strip=always"
+          # Global Bazel flags (added --linkopt=-fuse-ld=lld, you can drop clang if you prefer gcc)
+          GLOBAL_FLAGS="--config=monolithic \
+                        --copt=-DNDEBUG --copt=-fdata-sections --linkopt=-Wl,--gc-sections \
+                        --copt=-O3 --copt=-flto --linkopt=-flto --strip=always \
+                        --linkopt=-fuse-ld=lld --jobs=2"
 
-          # Set architecture-specific build flags.
-          if [[ "$ARCH" == "x86_64" ]]; then
-            ARCH_FLAG="--cpu=k8"
-          elif [[ "$ARCH" == "aarch64" ]]; then
+          if [[ "$ARCH" == "aarch64" ]]; then
             ARCH_FLAG="--cpu=aarch64 --config=elinux_aarch64"
+            PLATFORM_FLAG="--platform=linux/arm64"
+          elif [[ "$ARCH" == "x86_64" ]]; then
+            ARCH_FLAG="--cpu=k8"
+            PLATFORM_FLAG="--platform=linux/amd64"
           elif [[ "$ARCH" == "x86_64_noavx" ]]; then
             ARCH_FLAG="--cpu=core2 --copt=-mno-avx --copt=-mno-avx2 --copt=-msse4.2 --copt=-msse4.1"
-          else
-            echo \"Unknown architecture: $ARCH\"
-            exit 1
-          fi
-
-          # Set the Docker platform flag.
-          if [[ "$ARCH" == "aarch64" ]]; then
-            PLATFORM_FLAG="--platform=linux/arm64"
-          else
             PLATFORM_FLAG="--platform=linux/amd64"
+          else
+            echo "Unknown architecture: $ARCH"
+            exit 1
           fi
 
           docker run --rm --privileged $PLATFORM_FLAG \
@@ -66,34 +63,41 @@ jobs:
             $DOCKER_IMG \
             bash -c "
               set -eux
-
-              # ========== 1) Install System Dependencies ==========
               apt-get update
-              apt-get install -y build-essential clang git zip unzip pkg-config curl
+              apt-get install -y \
+                build-essential \
+                clang \
+                git \
+                zip \
+                unzip \
+                pkg-config \
+                curl \
+                zlib1g-dev \
+                lld
 
-              # ========== 2) Install Bazelisk ==========
+              # Optionally skip clang for ARM: apt-get remove clang
+              # or just do not export CC=clang below.
+
+              # Install Bazelisk
               if [[ \"$ARCH\" == \"aarch64\" ]]; then
-                # Download the Bazelisk binary for arm64.
                 curl -sSL https://github.com/bazelbuild/bazelisk/releases/download/v1.17.0/bazelisk-linux-arm64 -o /usr/local/bin/bazel
               else
                 curl -sSL https://github.com/bazelbuild/bazelisk/releases/download/v1.17.0/bazelisk-linux-amd64 -o /usr/local/bin/bazel
               fi
               chmod +x /usr/local/bin/bazel
 
-              # ========== 3) Create and Activate a Virtual Environment ==========
               python -m venv /opt/tflite_env
               source /opt/tflite_env/bin/activate
-
-              # Upgrade pip and install required Python packages.
               pip install --upgrade pip wheel numpy auditwheel setuptools
 
-              # ========== 4) Clone TensorFlow v2.17.1 ==========
               git clone https://github.com/tensorflow/tensorflow.git
               cd tensorflow
               git checkout tags/v${TFLITE_VERSION}
 
-              # ========== 5) Build TFLite Runtime ==========
+              # If you really want clang:
               export CC=clang
+              export CXX=clang++
+
               export TF_PYTHON_VERSION=${PYTHON_VERSION}
               export PYTHON=/opt/tflite_env/bin/python
 
@@ -101,36 +105,24 @@ jobs:
                 --define=tflite_enable_xnnpack=true \
                 --define=xnnpack_enable_subgraph_reshaping=true \
                 --define=no_tensorflow_py_deps=true \
-                $ARCH_FLAG \
-                $GLOBAL_FLAGS
+                ${ARCH_FLAG} \
+                ${GLOBAL_FLAGS}
 
-              # ========== 6) Locate and Rename the Built Wheel ==========
               mkdir -p /work/wheels
               WHEEL_PATH=\$(find tensorflow/lite/tools/pip_package/gen/tflite_pip/python3/dist -name \"*.whl\" | head -n 1)
-
               if [[ -z \"\$WHEEL_PATH\" ]]; then
                 echo \"Error: No wheel file found!\"
                 exit 1
               fi
-
-              echo \"Found wheel: \$WHEEL_PATH\"
-
-              # Determine the correct architecture name.
-              if [[ \"$ARCH\" == \"x86_64_noavx\" ]]; then
-                ARCH_NAME=\"x86_64_noavx\"
+              if [[ \"$ARCH\" == \"aarch64\" ]]; then
+                ARCH_NAME=\"aarch64\"
               elif [[ \"$ARCH\" == \"x86_64\" ]]; then
                 ARCH_NAME=\"x86_64\"
-              elif [[ \"$ARCH\" == \"aarch64\" ]]; then
-                ARCH_NAME=\"aarch64\"
               else
-                ARCH_NAME=\"unknown\"
+                ARCH_NAME=\"x86_64_noavx\"
               fi
-
-              # Generate new filename: tflite_runtime-{TFLITE_VERSION}-{PYTHON_VERSION}-linux_{ARCH}.whl
-              NEW_WHEEL_PATH=\"/work/wheels/tflite_runtime-${TFLITE_VERSION}-${PYTHON_VERSION}-linux_${ARCH_NAME}.whl\"
+              NEW_WHEEL_PATH=\"/work/wheels/tflite_runtime-${TFLITE_VERSION}-${PYTHON_VERSION}-linux_\${ARCH_NAME}.whl\"
               mv \"\$WHEEL_PATH\" \"\$NEW_WHEEL_PATH\"
-
-              echo \"Renamed wheel to: \$NEW_WHEEL_PATH\"
             "
 
       - name: List Built Wheels
