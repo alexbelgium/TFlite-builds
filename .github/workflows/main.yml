@@ -113,17 +113,17 @@ jobs:
 
               # Determine the correct architecture name.
               if [[ \"$ARCH\" == \"x86_64_noavx\" ]]; then
-                ARCH_NAME=\"linux_x86_64_noavx\"
+                ARCH_NAME=\"x86_64_noavx\"
               elif [[ \"$ARCH\" == \"x86_64\" ]]; then
-                ARCH_NAME=\"linux_x86_64\"
+                ARCH_NAME=\"x86_64\"
               elif [[ \"$ARCH\" == \"aarch64\" ]]; then
-                ARCH_NAME=\"linux_aarch64\"
+                ARCH_NAME=\"aarch64\"
               else
                 ARCH_NAME=\"unknown\"
               fi
 
-              # Append Python version to the wheel name.
-              NEW_WHEEL_PATH=\"/work/wheels/\$(basename \"\$WHEEL_PATH\" .whl)-\${ARCH_NAME}-py${PYTHON_VERSION}.whl\"
+              # Generate new filename: tflite_runtime-{TFLITE_VERSION}-{PYTHON_VERSION}-linux_{ARCH}.whl
+              NEW_WHEEL_PATH=\"/work/wheels/tflite_runtime-${TFLITE_VERSION}-${PYTHON_VERSION}-linux_${ARCH_NAME}.whl\"
               mv \"\$WHEEL_PATH\" \"\$NEW_WHEEL_PATH\"
 
               echo \"Renamed wheel to: \$NEW_WHEEL_PATH\"
