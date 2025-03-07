@@ -32,7 +32,10 @@ jobs:
       - name: Cleanup old wheels and cache
         run: |
           rm -rf wheels/* || true
-          bazel clean --expunge
+          if [ -d "tensorflow" ]; then
+            cd tensorflow
+            bazel clean --expunge
+          fi
           rm -rf ~/.cache/bazel
 
       - name: Free up Disk Space
