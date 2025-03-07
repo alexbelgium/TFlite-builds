@@ -42,6 +42,7 @@ jobs:
         run: |
           set -eux
           ARCH=${{ matrix.arch }}
+          echo "ARCH is $ARCH"
           PYTHON_VERSION=${{ matrix.python }}
 
           echo "Building for architecture: $ARCH"
@@ -54,16 +55,15 @@ jobs:
           #GLOBAL_FLAGS="--config=monolithic --copt=-DNDEBUG --copt=-fdata-sections --linkopt=-Wl,--gc-sections --copt=-O3 --copt=-flto --linkopt=-flto --strip=always"
 
           # Set architecture-specific build flags.
-          if [[ "$ARCH" == "x86_64" ]]; then
-            ARCH_FLAG="--cpu=k8"
-          elif [[ "$ARCH" == "aarch64" ]]; then
-            ARCH_FLAG="--cpu=aarch64 --config=elinux_aarch64"
-          elif [[ "$ARCH" == "x86_64_noavx" ]]; then
-            ARCH_FLAG="--cpu=core2 --copt=-mno-avx --copt=-mno-avx2 --copt=-msse4.2 --copt=-msse4.1"
-          else
-            echo "Unknown architecture: $ARCH"
-            exit 1
-          fi
+          case "$ARCH" in
+            x86_64_noavx) ARCH_NAME="x86_64_noavx" ;;
+            x86_64) ARCH_NAME="x86_64" ;;
+            aarch64) ARCH_NAME="aarch64" ;;
+            *)
+              echo "Warning: Unknown architecture '$ARCH', setting ARCH_NAME to 'unknown'"
+              ARCH_NAME="unknown"
+              ;;
+          esac
 
           # Set the Docker platform flag.
           if [[ "$ARCH" == "aarch64" ]]; then
