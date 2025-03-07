@@ -18,8 +18,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        arch: [x86_64, aarch64, x86_64_noavx]
-        python: ["3.9", "3.10", "3.11", "3.12"]
+        arch: [ x86_64, aarch64, x86_64_noavx ]
+        python: [ "3.9", "3.10", "3.11", "3.12" ]
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -36,26 +36,23 @@ jobs:
           # We'll just use a Debian/Bookworm image (x86_64).
           DOCKER_IMG="python:${PYTHON_VERSION}-slim-bookworm"
 
+          # Set global Bazel flags (example optimization flags).
+          GLOBAL_FLAGS="--copt=-O3 --copt=-flto --linkopt=-flto --strip=always"
+
           # ARCH-specific build flags.
+          # For cross-compiling aarch64:
+          #   - We set --config=elinux_aarch64
+          #   - We will override CC/CXX to the cross-toolchain inside the container.
           if [[ "$ARCH" == "x86_64" ]]; then
             ARCH_FLAG="--cpu=k8"
           elif [[ "$ARCH" == "aarch64" ]]; then
-            ARCH_FLAG="--cpu=aarch64 \
-                      --config=elinux_aarch64 \
-                      --crosstool_top=@local_config_arm_compiler//:toolchain \
-                      --host_crosstool_top=@bazel_tools//tools/cpp:toolchain \
-                      --platforms=@local_config_platform//:linux_aarch64 \
-                      --host_platform=@local_config_platform//:linux_aarch64"
+            ARCH_FLAG="--cpu=aarch64 --config=elinux_aarch64"
           elif [[ "$ARCH" == "x86_64_noavx" ]]; then
             ARCH_FLAG="--cpu=core2 --copt=-mno-avx --copt=-mno-avx2 --copt=-msse4.2 --copt=-msse4.1"
           else
             echo "Unknown architecture: $ARCH"
             exit 1
           fi
-          
-          GLOBAL_FLAGS="--distinct_host_configuration=false \
-                        --copt=-DNDEBUG --copt=-fdata-sections --linkopt=-Wl,--gc-sections \
-                        --copt=-O3 --copt=-flto --linkopt=-flto --strip=always"
 
           docker run --rm \
             -v $PWD:/work \
@@ -119,7 +116,7 @@ jobs:
               fi
 
               # -----------------------
-              # 6) Build TFLite Runtime
+              # 6) Build TFLite Runtime with Bazel
               # -----------------------
               ./tensorflow/lite/tools/pip_package/build_pip_package_with_bazel.sh \
                 --define=tflite_enable_xnnpack=true \
@@ -167,6 +164,7 @@ jobs:
   release:
     runs-on: ubuntu-latest
     needs: build-tflite-runtime
+    name: Create and Upload Release
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
