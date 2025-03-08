@@ -1,9 +1,7 @@
 name: publish-tflite-runtime-wheels
 
 on:
-  push:
-    branches: [ "main" ]
-  pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: write  # Ensure GITHUB_TOKEN can create releases
@@ -19,8 +17,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        arch: [aarch64]
-        python: ["3.11"]
+        arch: [x86_64, x86_64_noavx]
+        python: ["3.9", "3.10", "3.11", "3.12"]
 #        arch: [x86_64, x86_64_noavx, aarch64]
 #        python: ["3.9", "3.10", "3.11", "3.12"]
     steps:
