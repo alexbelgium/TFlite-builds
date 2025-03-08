@@ -56,7 +56,7 @@ jobs:
             python$PYTHON_VERSION-dev python$PYTHON_VERSION-venv
 
           # ========== 2) Install Bazel (x86_64 binary is fine; we just pass cross-compilation flags) ==========
-          sudo curl -sSL https://github.com/bazelbuild/bazelisk/releases/download/v1.25.0/bazelisk-linux-amd64 -o /usr/local/bin/bazel
+          sudo curl -sSL https://github.com/bazelbuild/bazelisk/releases/download/v1.24.1/bazelisk-linux-amd64 -o /usr/local/bin/bazel
           sudo chmod 777 /usr/local/bin/bazel
           echo "Bazel version is $(bazel --version)"
 
@@ -84,7 +84,7 @@ jobs:
             aarch64)
               # Enforce cross-compilation settings
               ARCH_FLAGS="--config=elinux_aarch64  --copt=-mno-avx --copt=-mno-avx2 --copt=-msse4.2 --copt=-msse4.1 --copt=-msse4.1"
-              export TENSORFLOW_TARGET="aarch64"
+              #export TENSORFLOW_TARGET="aarch64"
               ;;
             *)
               echo "Unknown ARCH '$ARCH'"
