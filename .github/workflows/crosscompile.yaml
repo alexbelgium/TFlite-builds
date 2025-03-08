@@ -21,121 +21,7 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
-name: publish-tflite-runtime-wheels
-
-on:
-  workflow_dispatch:
-
-permissions:
-  contents: write  # Ensure GITHUB_TOKEN can create releases
-
-env:
-  TFLITE_VERSION: "2.17.1"
-
-jobs:
-  build-tflite-runtime:
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        arch: [aarch64]
-        python: ["3.11"]
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-
       - name: Build TFLite Runtime
-        run: |
-          set -eux
-
-          ARCH="${{ matrix.arch }}"
-          PYTHON_VERSION="${{ matrix.python }}"
-          echo "Building TFLite Runtime for $ARCH / Python $PYTHON_VERSION"
-
-          sudo add-apt-repository ppa:deadsnakes/ppa
-          sudo apt-get update
-          sudo apt-get install --no-install-recommends -y \
-            python$PYTHON_VERSION build-essential clang git zip unzip pkg-config curl \
-            python3-dev python3-venv
-
-          if [[ "$ARCH" == "aarch64" ]]; then
-            sudo apt-get install --no-install-recommends -y crossbuild-essential-arm64
-          fi
-
-          sudo curl -sSL https://github.com/bazelbuild/bazelisk/releases/download/v1.25.0/bazelisk-linux-amd64 -o /usr/local/bin/bazel
-          sudo chmod 777 /usr/local/bin/bazel
-          echo "Bazel version is $(bazel --version)"
-
-          python${PYTHON_VERSION} -m venv /tmp/tflite_env
-          source /tmp/tflite_env/bin/activate
-          pip install --upgrade pip wheel numpy auditwheel setuptools
-
-          git clone https://github.com/tensorflow/tensorflow.git
-          cd tensorflow
-          git checkout tags/v${TFLITE_VERSION}
-
-          # Print Bazel configurations
-          echo "===== Bazel Configuration ====="
-          cat .bazelrc || echo "No .bazelrc found"
-
-          # Print all occurrences of "-msse4.2" in TensorFlow build files
-          echo "===== Searching for -msse4.2 in TensorFlow Build Files ====="
-          grep -r --include=*.bzl --include=*.BUILD --include=.bazelrc "-msse4.2" . || echo "No -msse4.2 found"
-
-          GLOBAL_FLAGS="--strip=always"
-          EXTRA_BAZEL_FLAGS=""
-
-          case "$ARCH" in
-            aarch64)
-              ARCH_FLAGS="--config=elinux_aarch64 --copt=-O3 --copt=-mno-sse4.2 --copt=-mno-sse4.1 --copt=-mno-avx"
-              export CC=aarch64-linux-gnu-gcc
-              export CXX=aarch64-linux-gnu-g++
-              export LD_LIBRARY_PATH=/usr/aarch64-linux-gnu/lib
-              EXTRA_BAZEL_FLAGS="--action_env=CC=aarch64-linux-gnu-gcc --action_env=CXX=aarch64-linux-gnu-g++"
-
-              if [ -f lite/build_def.bzl ]; then
-                echo "lite/build_def.bzl exists"
-                sed -i "/msse/d" lite/build_def.bzl
-              else
-                echo "no lite/build_def.bzl exists"
-              fi
-
-              if [ -f ".bazelrc" ]; then
-                echo "===== Original .bazelrc ====="
-                cat .bazelrc
-                sed -i '/--copt=-msse4.2/d' .bazelrc
-                sed -i '/--copt=-msse4.1/d' .bazelrc
-                sed -i '/--copt=-mavx/d' .bazelrc
-                echo "===== Modified .bazelrc ====="
-                cat .bazelrc
-              else
-                echo "no .bazelrc exists"
-              fi
-              ;;
-            *)
-              echo "Unknown ARCH '$ARCH'"
-              exit 1
-              ;;
-          esac
-
-          echo "ARCH_FLAGS: $ARCH_FLAGS"
-          echo "EXTRA_BAZEL_FLAGS: $EXTRA_BAZEL_FLAGS"
-
-          export TF_PYTHON_VERSION="$PYTHON_VERSION"
-          export PYTHON=$(which python)
-
-          # Run Bazel build with debug flags
-          ./tensorflow/lite/tools/pip_package/build_pip_package_with_bazel.sh \
-            --define=tflite_enable_xnnpack=true \
-            --define=xnnpack_enable_subgraph_reshaping=true \
-            --define=no_tensorflow_py_deps=true \
-            $ARCH_FLAGS \
-            $GLOBAL_FLAGS \
-            $EXTRA_BAZEL_FLAGS \
-            --verbose_failures \
-            --announce_rc
-
-      - name: Build TFLite Runtime2
         run: |
           set -eux
       
@@ -168,6 +54,13 @@ jobs:
           git clone https://github.com/tensorflow/tensorflow.git
           cd tensorflow
           git checkout tags/v${TFLITE_VERSION}
+
+          # DEBUG START
+          echo "===== Bazel Configuration ====="
+          cat .bazelrc || echo "No .bazelrc found"
+          echo "===== Searching for -msse4.2 in TensorFlow Build Files ====="
+          grep -r --include=*.bzl --include=*.BUILD --include=.bazelrc "-msse4.2" . || echo "No -msse4.2 found"
+          # DEBUG END
       
           # ========== 5) Architecture-specific Flags ==========
           GLOBAL_FLAGS="--strip=always"
@@ -202,7 +95,6 @@ jobs:
                 sed -i '/--copt=-msse4.2/d' .bazelrc
                 sed -i '/--copt=-msse4.1/d' .bazelrc
                 sed -i '/--copt=-mavx/d' .bazelrc
-                echo ".bazelrc exists"
               else
                 echo "no .bazelrc exists"
               fi
@@ -225,7 +117,9 @@ jobs:
             --define=no_tensorflow_py_deps=true \
             $ARCH_FLAGS \
             $GLOBAL_FLAGS \
-            $EXTRA_BAZEL_FLAGS
+            $EXTRA_BAZEL_FLAGS \
+            --verbose_failures \
+            --announce_rc
       
           # ========== 7) Locate and Rename the Wheel ==========
           mkdir -p /home/runner/work/wheels
