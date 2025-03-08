@@ -59,7 +59,7 @@ jobs:
           echo "===== Bazel Configuration ====="
           cat .bazelrc || echo "No .bazelrc found"
           echo "===== Searching for -msse4.2 in TensorFlow Build Files ====="
-          grep -r --include=*.bzl --include=*.BUILD --include=.bazelrc "-msse4.2" . || echo "No -msse4.2 found"
+          grep -r --include=*.bzl --include=*.BUILD --include=.bazelrc "\-msse4.2" . || echo "No -msse4.2 found"
           # DEBUG END
       
           # ========== 5) Architecture-specific Flags ==========
@@ -92,9 +92,8 @@ jobs:
               fi
       
               if [ -f ".bazelrc" ]; then
-                sed -i '/--copt=-msse4.2/d' .bazelrc
-                sed -i '/--copt=-msse4.1/d' .bazelrc
-                sed -i '/--copt=-mavx/d' .bazelrc
+                sed -i '/msse/d' .bazelrc
+                sed -i '/mavx/d' .bazelrc
               else
                 echo "no .bazelrc exists"
               fi
