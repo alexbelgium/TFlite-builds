@@ -119,8 +119,6 @@ jobs:
               apt-get autoremove -y
               apt-get install -y \
                 build-essential \
-                clang \
-                clang++ \
                 lld \
                 gcc-aarch64-linux-gnu \
                 git \
