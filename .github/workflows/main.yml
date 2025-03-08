@@ -102,7 +102,7 @@ jobs:
               # ========== 2) Install Stable Bazel Version ==========
               case \"$ARCH\" in
                 x86_64*) curl -sSL https://github.com/bazelbuild/bazelisk/releases/download/v1.25.0/bazelisk-linux-amd64 -o /usr/local/bin/bazel;;
-                aarch64) curl -sSL \"https://github.com/bazelbuild/bazel/releases/download/8.1.1/bazel-8.1.1-linux-arm64\" -o /usr/local/bin/bazel;;
+                aarch64) curl -sSL \"https://github.com/bazelbuild/bazel/releases/download/7.7.0/bazel-7.7.0-linux-arm64\" -o /usr/local/bin/bazel;;
                 *)
                   echo \"Warning: Unknown architecture '$ARCH'\"
                   exit 1
