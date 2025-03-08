@@ -45,14 +45,14 @@ jobs:
       - name: Prepare Namings
         id: prepare_names
         run: |
-          echo "python_version=${{ matrix.python }}" | sed 's/\.//g' >> $GITHUB_ENV
+          echo "python_version_name=${{ matrix.python }}" | sed 's/\.//g' >> $GITHUB_ENV
           case "${{ matrix.arch }}" in
             x86_64|aarch64)
-              echo "tflite_version=${TFLITE_VERSION}" >> $GITHUB_ENV
+              echo "tflite_version_name=${TFLITE_VERSION}" >> $GITHUB_ENV
               echo "arch_version=${{ matrix.arch }}" >> $GITHUB_ENV
             ;;
             x86_64_noavx)
-              echo "tflite_version=${TFLITE_VERSION}_noavx" >> $GITHUB_ENV
+              echo "tflite_version_name=${TFLITE_VERSION}_noavx" >> $GITHUB_ENV
               echo "arch_version=x86_64" >> $GITHUB_ENV
             ;;
             *)
@@ -102,8 +102,9 @@ jobs:
             -w /work \
             -e ARCH="$ARCH" \
             -e PYTHON_VERSION="$PYTHON_VERSION" \
-            -e TFLITE_VERSION="${{ env.TFLITE_VERSION }}" \
-            -e TFLITE_VERSION_NAME="${{ env.tflite_version }}" \
+            -e PYTHON_VERSION_NAME="${{ env.python_version_name }}" \
+            -e TFLITE_VERSION="$TFLITE_VERSION" \
+            -e TFLITE_VERSION_NAME="${{ env.tflite_version_name }}" \
             -e ARCH_VERSION="${{ env.arch_version }}" \
             -e ARCH_FLAG="$ARCH_FLAG" \
             -e GLOBAL_FLAGS="$GLOBAL_FLAGS" \
@@ -143,31 +144,17 @@ jobs:
               git checkout tags/v\${TFLITE_VERSION}
 
               # ========== 6) Build TFLite Runtime ==========
-              # export CC=clang
-              export CC=gcc
+              export CC=clang
               export TF_PYTHON_VERSION=\${PYTHON_VERSION}
               export PYTHON=/opt/tflite_env/bin/python
               export BAZELISK_CACHE=/tmp/bazelisk_cache
               mkdir -p /tmp/bazelisk_cache
 
-              [[ \"$(ARCH_VERSION)\" == \"aarch64\" ]] && export TENSORFLOW_TARGET=aarch64
+              [[ \"\${ARCH_VERSION}\" == \"aarch64\" ]] \&\& export TENSORFLOW_TARGET=\"aarch64\"
 
-              ./tensorflow/lite/tools/pip_package/build_pip_package_with_bazel.sh \
-                --define=tflite_enable_xnnpack=true \
+              ./tensorflow/lite/tools/pip_package/build_pip_package_with_bazel.sh --define=tflite_enable_xnnpack=true \
                 --define=xnnpack_enable_subgraph_reshaping=true \
                 --define=no_tensorflow_py_deps=true \
-                --jobs=2 \
-                \$ARCH_FLAG \
-                \$GLOBAL_FLAGS \
-                --verbose_failures || true
-
-              echo "TRYING WITH CLANG"
-              export CC=clang
-              ./tensorflow/lite/tools/pip_package/build_pip_package_with_bazel.sh \
-                --define=tflite_enable_xnnpack=true \
-                --define=xnnpack_enable_subgraph_reshaping=true \
-                --define=no_tensorflow_py_deps=true \
-                --jobs=2 \
                 \$ARCH_FLAG \
                 \$GLOBAL_FLAGS \
                 --verbose_failures
@@ -183,7 +170,7 @@ jobs:
 
               echo \"Found wheel: \$WHEEL_PATH\"
 
-              NEW_WHEEL_PATH="/work/wheels/tflite_runtime-${tflite_version}-cp${PYTHON_VERSION//./}-cp${PYTHON_VERSION//./}-linux_${arch_version}.whl"
+              NEW_WHEEL_PATH="/work/wheels/tflite_runtime-\${TFLITE_VERSION_NAME}-cp\${PYTHON_VERSION_NAME}-cp\${PYTHON_VERSION_NAME}-linux_\${ARCH_VERSION_NAME}.whl"
               mv \"\$WHEEL_PATH\" \"\$NEW_WHEEL_PATH\"
 
               echo \"Renamed wheel to: \$NEW_WHEEL_PATH\"
@@ -201,7 +188,7 @@ jobs:
       - name: Upload Wheel Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: tflite_runtime-${{ env.tflite_version }}-cp${{ env.python_version }}-cp${{ env.python_version }}-linux_${{ env.arch_version }}
+          name: tflite_runtime-${{ env.tflite_version_name }}-cp${{ env.python_version_name }}-cp${{ env.python_version_name }}-linux_${{ env.arch_version_name }}
           path: wheels/*.whl
 
   release:
