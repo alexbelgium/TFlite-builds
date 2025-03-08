@@ -82,10 +82,7 @@ jobs:
               EXTRA_BAZEL_FLAGS="--action_env=CC=aarch64-linux-gnu-gcc --action_env=CXX=aarch64-linux-gnu-g++"
 
               echo "DEBUG sse"
-              sed -i "/msse/d" tensorflow/compiler/mlir/lite/build_def.bzl || echo "tensorflow/compiler/mlir/lite/build_def.bzl not found"
-              sed -i "/msse/d" tensorflow/lite/build_def.bzl || echo "tensorflow/lite/build_def.bzl not found"
-              sed -i "/msse/d" compiler/mlir/lite/build_def.bzl || echo "compiler/mlir/lite/build_def.bzl not found"
-              sed -i "/msse/d" lite/build_def.bzl || echo "lite/build_def.bzl not found"
+              sed -i "/msse/d" tensorflow/lite/build_def.bzl
 
               echo "DEBUG .bazelrc"
               find -name ".bazelrc" / 2/dev/null
