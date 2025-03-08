@@ -53,7 +53,7 @@ jobs:
           echo "Building for architecture: $ARCH"
 
           # Use a Bookworm-based image for all Python versions to ensure a recent Clang.
-          DOCKER_IMG="python:${PYTHON_VERSION}-bookworm"
+          DOCKER_IMG="python:${PYTHON_VERSION}-ubuntu"
 
           # Set global flags
           GLOBAL_FLAGS="--strip=always"
@@ -84,6 +84,7 @@ jobs:
             -w /work \
             -e ARCH="$ARCH" \
             -e PYTHON_VERSION="$PYTHON_VERSION" \
+            -e TFLITE_VERSION="TFLITE_VERSION" \
             -e ARCH_FLAG="$ARCH_FLAG" \
             -e GLOBAL_FLAGS="$GLOBAL_FLAGS" \
             --memory=8g --cpus=4 \
