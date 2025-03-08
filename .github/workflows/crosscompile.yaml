@@ -70,6 +70,7 @@ jobs:
             -e PYTHON_VERSION="$PYTHON_VERSION" \
             -e ARCH_FLAG="$ARCH_FLAG" \
             -e GLOBAL_FLAGS="$GLOBAL_FLAGS" \
+            -e TFLITE_VERSION="$TFLITE_VERSION" \
             --memory=8g --cpus=4 \
             $DOCKER_IMG \
             bash -c "
@@ -85,7 +86,7 @@ jobs:
               # ========== 2) Install Stable Bazel Version ==========
               case \"\$ARCH\" in
                 x86_64*) curl -sSL https://github.com/bazelbuild/bazelisk/releases/download/v1.25.0/bazelisk-linux-amd64 -o /usr/local/bin/bazel;;
-                aarch64) curl -sSL \"https://github.com/bazelbuild/bazel/releases/download/7.5.0/bazel-7.5.0-linux-arm64\" -o /usr/local/bin/bazel;;
+                aarch64) curl -sSL \"https://github.com/bazelbuild/bazel/releases/download/7.7.0/bazel-7.7.0-linux-arm64\" -o /usr/local/bin/bazel;;
                 *)
                   echo \"Warning: Unknown architecture '\$ARCH'\"
                   exit 1
