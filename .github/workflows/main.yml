@@ -52,7 +52,7 @@ jobs:
 
           echo "Building for architecture: $ARCH"
 
-          # Use a Bookworm-based image for all Python versions to ensure a recent Clang.
+          # Use an Ubuntu-based image for all Python versions to ensure a recent Clang.
           DOCKER_IMG="python:${PYTHON_VERSION}-ubuntu"
 
           # Set global flags
@@ -92,7 +92,7 @@ jobs:
             bash -c "
               set -eux
 
-              echo \"STARTING BUILD : env $(uname) -m arch $ARCH python $PYTHON_VERSION with flags $ARCH_FLAG $GLOBAL_FLAGS\"
+              echo \"STARTING BUILD : env \$(uname) -m arch $ARCH python $PYTHON_VERSION with flags $ARCH_FLAG $GLOBAL_FLAGS\"
 
               # ========== 1) Install System Dependencies ==========
               apt-get update
@@ -102,7 +102,7 @@ jobs:
               # ========== 2) Install Stable Bazel Version ==========
               case \"$ARCH\" in
                 x86_64*) curl -sSL https://github.com/bazelbuild/bazelisk/releases/download/v1.25.0/bazelisk-linux-amd64 -o /usr/local/bin/bazel;;
-                aarch64) curl -sSL "https://github.com/bazelbuild/bazel/releases/download/8.1.1/bazel-8.1.1-linux-arm64" -o /usr/local/bin/bazel;;
+                aarch64) curl -sSL \"https://github.com/bazelbuild/bazel/releases/download/8.1.1/bazel-8.1.1-linux-arm64\" -o /usr/local/bin/bazel;;
                 *)
                   echo \"Warning: Unknown architecture '$ARCH'\"
                   exit 1
@@ -111,7 +111,7 @@ jobs:
 
               # Add permissions
               chmod 777 /usr/local/bin/bazel
-              echo \"Bazel version is $(bazel --version)\"
+              echo \"Bazel version is \$(bazel --version)\"
 
               # ========== 3) Set up Bazel Cache Permissions ==========
               mkdir -p /root/.cache/bazel
@@ -127,11 +127,11 @@ jobs:
               # ========== 5) Clone TensorFlow v2.17.1 ==========
               git clone https://github.com/tensorflow/tensorflow.git
               cd tensorflow
-              git checkout tags/v${TFLITE_VERSION}
+              git checkout tags/v\${TFLITE_VERSION}
 
               # ========== 6) Build TFLite Runtime ==========
               export CC=clang
-              export TF_PYTHON_VERSION=${PYTHON_VERSION}
+              export TF_PYTHON_VERSION=\${PYTHON_VERSION}
               export PYTHON=/opt/tflite_env/bin/python
               export BAZELISK_CACHE=/tmp/bazelisk_cache
               mkdir -p /tmp/bazelisk_cache
@@ -140,8 +140,8 @@ jobs:
                 --define=tflite_enable_xnnpack=true \
                 --define=xnnpack_enable_subgraph_reshaping=true \
                 --define=no_tensorflow_py_deps=true \
-                $ARCH_FLAG \
-                $GLOBAL_FLAGS
+                \$ARCH_FLAG \
+                \$GLOBAL_FLAGS
 
               # ========== 7) Locate and Rename the Built Wheel ==========
               mkdir -p /work/wheels
@@ -155,7 +155,7 @@ jobs:
               echo \"Found wheel: \$WHEEL_PATH\"
 
               # Generate new filename: tflite_runtime-{TFLITE_VERSION}-{PYTHON_VERSION}-linux_{ARCH}.whl
-              NEW_WHEEL_PATH=\"/work/wheels/tflite_runtime-${TFLITE_VERSION}-${PYTHON_VERSION}-linux_${ARCH}.whl\"
+              NEW_WHEEL_PATH=\"/work/wheels/tflite_runtime-\${TFLITE_VERSION}-\${PYTHON_VERSION}-linux_\${ARCH}.whl\"
               mv \"\$WHEEL_PATH\" \"\$NEW_WHEEL_PATH\"
 
               echo \"Renamed wheel to: \$NEW_WHEEL_PATH\"
@@ -173,7 +173,7 @@ jobs:
       - name: Upload Wheel Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: tflite_runtime-${{ env.TFLITE_VERSION }}-${{ matrix.arch }}-py${{ matrix.python }}
+          name: tflite_runtime-\${{ env.TFLITE_VERSION }}-\${{ matrix.arch }}-py\${{ matrix.python }}
           path: wheels/*.whl
 
   release:
@@ -195,20 +195,20 @@ jobs:
       - name: Authenticate GitHub CLI
         run: gh auth status
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: \${{ secrets.GITHUB_TOKEN }}
 
       - name: Create GitHub Release (if not exists)
         run: |
-          gh release view ${{ env.TFLITE_VERSION }} -R "${{ github.repository }}" > /dev/null 2>&1 || \
-          gh release create ${{ env.TFLITE_VERSION }} \
-            -R "${{ github.repository }}" \
-            --title "tflite_runtime ${{ env.TFLITE_VERSION }}" \
-            --notes "Automated build for tflite_runtime ${{ env.TFLITE_VERSION }}"
+          gh release view \${{ env.TFLITE_VERSION }} -R "\${{ github.repository }}" > /dev/null 2>&1 || \
+          gh release create \${{ env.TFLITE_VERSION }} \
+            -R "\${{ github.repository }}" \
+            --title "tflite_runtime \${{ env.TFLITE_VERSION }}" \
+            --notes "Automated build for tflite_runtime \${{ env.TFLITE_VERSION }}"
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: \${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload Wheels to GitHub Release
         run: |
-          gh release upload ${{ env.TFLITE_VERSION }} wheels/**/*.whl --clobber -R "${{ github.repository }}"
+          gh release upload \${{ env.TFLITE_VERSION }} wheels/**/*.whl --clobber -R "\${{ github.repository }}"
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: \${{ secrets.GITHUB_TOKEN }}
