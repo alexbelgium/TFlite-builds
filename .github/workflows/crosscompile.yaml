@@ -15,7 +15,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        arch: [x86_64, x86_64_noavx, aarch64]
+        arch: [aarch64]
         python: ["3.11"]
     steps:
       - name: Check out repository
@@ -75,7 +75,7 @@ jobs:
               ;;
             aarch64)
               # Cross-compile for aarch64
-              ARCH_FLAGS="--config=elinux_aarch64"
+              ARCH_FLAGS="--config=elinux_aarch64 --copt=-O3 --copt=-mno-sse4.2 --copt=-mno-sse4.1 --copt=-mno-avx"
               export CC=aarch64-linux-gnu-gcc
               export CXX=aarch64-linux-gnu-g++
               export LD_LIBRARY_PATH=/usr/aarch64-linux-gnu/lib
@@ -97,7 +97,16 @@ jobs:
             --define=tflite_enable_xnnpack=true \
             --define=xnnpack_enable_subgraph_reshaping=true \
             --define=no_tensorflow_py_deps=true \
-            $ARCH_FLAGS \
+            --config=elinux_aarch64 --copt=-mavx --copt=-mavx2 --copt=-mfma --copt=-mfpmath=both --copt=-msse4.1 --copt=-msse4.2" \
+            $GLOBAL_FLAGS \
+            $EXTRA_BAZEL_FLAGS || echo "THIS FAILED MISERABLY"
+
+          export PYTHON=$(which python)
+          ./tensorflow/lite/tools/pip_package/build_pip_package_with_bazel.sh \
+            --define=tflite_enable_xnnpack=true \
+            --define=xnnpack_enable_subgraph_reshaping=true \
+            --define=no_tensorflow_py_deps=true \
+            --config=elinux_aarch64 -mavx -mavx2 -mfma -mfpmath=both -msse4.1 -msse4.2" \
             $GLOBAL_FLAGS \
             $EXTRA_BAZEL_FLAGS
 
