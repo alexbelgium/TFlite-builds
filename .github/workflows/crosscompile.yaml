@@ -57,7 +57,9 @@ jobs:
 
           # Install cross-compiler if target is aarch64
           if [[ "$ARCH" == "aarch64" ]]; then
-            sudo apt-get install --no-install-recommends -y crossbuild-essential-arm64
+            sudo dpkg --add-architecture arm64
+            sudo apt-get update
+            sudo apt-get install --no-install-recommends -y crossbuild-essential-arm64 python$PYTHON_VERSION-dev:arm64 python$PYTHON_VERSION-venv:arm64
           fi
 
           # ========== 2) Install Bazel (x86_64 binary is fine; we just pass cross-compilation flags) ==========
