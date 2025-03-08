@@ -17,8 +17,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        arch: [x86_64, x86_64_noavx]
-        python: ["3.9", "3.10", "3.11", "3.12"]
+        arch: [aarch64]
+        python: ["3.11"]
 #        arch: [x86_64, x86_64_noavx, aarch64]
 #        python: ["3.9", "3.10", "3.11", "3.12"]
     steps:
