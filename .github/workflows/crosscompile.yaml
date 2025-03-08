@@ -88,13 +88,9 @@ jobs:
           case "$ARCH" in
             x86_64)
               ARCH_FLAGS="--cpu=k8"
-              export CC=clang
-              export CXX=clang++
               ;;
             x86_64_noavx)
               ARCH_FLAGS="--cpu=core2 --copt=-mno-avx --copt=-mno-avx2 --copt=-msse4.2 --copt=-msse4.1"
-              export CC=clang
-              export CXX=clang++
               ;;
             aarch64)
               # Enforce cross-compilation settings
@@ -106,22 +102,6 @@ jobs:
               EXTRA_BAZEL_FLAGS="--action_env=CC=aarch64-linux-gnu-gcc \
                                  --action_env=CXX=aarch64-linux-gnu-g++ \
                                  --action_env=LD_LIBRARY_PATH=/usr/aarch64-linux-gnu/lib"
-
-              # Remove SSE/AVX references if present
-              if [ -f tensorflow/lite/build_def.bzl ]; then
-                echo "tensorflow/lite/build_def.bzl exists"
-                sed -i '/msse/d' tensorflow/lite/build_def.bzl
-                sed -i '/mavx/d' tensorflow/lite/build_def.bzl
-              else
-                echo "no tensorflow/lite/build_def.bzl exists"
-              fi
-
-              if [ -f ".bazelrc" ]; then
-                sed -i '/msse/d' .bazelrc
-                sed -i '/mavx/d' .bazelrc
-              else
-                echo "no .bazelrc exists"
-              fi
               ;;
             *)
               echo "Unknown ARCH '$ARCH'"
@@ -136,7 +116,7 @@ jobs:
           export TF_PYTHON_VERSION="$PYTHON_VERSION"
           export PYTHON=$(which python)
           ./tensorflow/lite/tools/pip_package/build_pip_package_with_bazel.sh \
-            -config=elinux_aarch64 --cpu=aarch64 --copt=-mno-avx --copt=-mno-avx2 --copt=-msse4.2 --copt=-msse4.1 \
+            $ARCH_FLAGS \
             --define=tflite_enable_xnnpack=true \
             --define=xnnpack_enable_subgraph_reshaping=true \
             --define=no_tensorflow_py_deps=true \
@@ -146,7 +126,7 @@ jobs:
             --announce_rc || true
           echo "DEBUG try"
           ./tensorflow/lite/tools/pip_package/build_pip_package_with_bazel.sh \
-            -config=elinux_aarch64 \
+            $ARCH_FLAGS \
             --define=tflite_enable_xnnpack=true \
             --define=xnnpack_enable_subgraph_reshaping=true \
             --verbose_failures \
