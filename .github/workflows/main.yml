@@ -17,8 +17,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        arch: [aarch64]
-        python: ["3.11"]
+        arch: [x86_64, x86_64_noavx]
+        python: ["3.9", "3.10", "3.11", "3.12"]
 #        arch: [x86_64, x86_64_noavx, aarch64]
 #        python: ["3.9", "3.10", "3.11", "3.12"]
     steps:
@@ -153,7 +153,7 @@ jobs:
               echo \"Found wheel: \$WHEEL_PATH\"
 
               # Generate new filename: tflite_runtime-{TFLITE_VERSION}-{PYTHON_VERSION}-linux_{ARCH}.whl
-              NEW_WHEEL_PATH=\"/work/wheels/tflite_runtime-\${TFLITE_VERSION}-\${PYTHON_VERSION}-linux_\${ARCH}.whl\"
+              NEW_WHEEL_PATH="/work/wheels/tflite_runtime-${TFLITE_VERSION}-cp${PYTHON_VERSION//./}-cp${PYTHON_VERSION//./}-linux_${ARCH}.whl"
               mv \"\$WHEEL_PATH\" \"\$NEW_WHEEL_PATH\"
 
               echo \"Renamed wheel to: \$NEW_WHEEL_PATH\"
@@ -171,7 +171,7 @@ jobs:
       - name: Upload Wheel Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: tflite_runtime-${{ env.TFLITE_VERSION }}-${{ matrix.arch }}-py${{ matrix.python }}
+          name: tflite_runtime-${{ env.TFLITE_VERSION }}-cp${{ matrix.python // '.' }}-cp${{ matrix.python // '.' }}-linux_${{ matrix.arch }}
           path: wheels/*.whl
 
   release:
