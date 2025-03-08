@@ -117,11 +117,11 @@ jobs:
               export DEBIAN_FRONTEND=noninteractive
               apt-get remove -y --purge libopencl-clang-14-dev libopencl-clang-15-dev python3-clang-13 python3-clang-14 python3-clang-15 python3-clang-16 python3-clang-19 || true
               apt-get autoremove -y
-              apt-get install --no-install-recommends -y \
+              apt-get install -y \
                 build-essential \
-                clang-17 \
-                clang++-17 \
-                lld-17 \
+                clang \
+                clang++ \
+                lld \
                 gcc-aarch64-linux-gnu \
                 git \
                 zip \
