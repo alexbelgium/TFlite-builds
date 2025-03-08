@@ -57,7 +57,6 @@ jobs:
 
           # Install cross-compiler if target is aarch64
           if [[ "$ARCH" == "aarch64" ]]; then
-            sudo dpkg --add-architecture arm64
             echo "deb [arch=arm64] http://ports.ubuntu.com/ jammy main universe multiverse restricted" | sudo tee -a /etc/apt/sources.list
             echo "deb [arch=arm64] http://ports.ubuntu.com/ jammy-updates main universe multiverse restricted" | sudo tee -a /etc/apt/sources.list
             echo "deb [arch=arm64] http://ports.ubuntu.com/ jammy-security main universe multiverse restricted" | sudo tee -a /etc/apt/sources.list
