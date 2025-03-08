@@ -85,7 +85,7 @@ jobs:
               sed -i "/msse/d" tensorflow/lite/build_def.bzl
 
               echo "DEBUG .bazelrc"
-              find -name ".bazelrc" / 2/dev/null
+              find / -name ".bazelrc" 2>/dev/null
               if [ -f .bazelrc ]; then
                 cat .bazelrc
                 sed -i '/--copt=-msse4.2/d' .bazelrc
