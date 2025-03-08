@@ -161,7 +161,8 @@ jobs:
                 --define=xnnpack_enable_subgraph_reshaping=true \
                 --define=no_tensorflow_py_deps=true \
                 \$ARCH_FLAG \
-                \$GLOBAL_FLAGS
+                \$GLOBAL_FLAGS \
+                --verbose_failures
 
               # ========== 7) Locate and Rename the Built Wheel ==========
               mkdir -p /work/wheels
