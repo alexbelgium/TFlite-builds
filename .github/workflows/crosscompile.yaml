@@ -98,9 +98,6 @@ jobs:
               # Enforce cross-compilation settings
               ARCH_FLAGS="--config=elinux_aarch64 --cpu=aarch64"
               export TENSORFLOW_TARGET="aarch64"
-              EXTRA_BAZEL_FLAGS="--action_env=CC=aarch64-linux-gnu-gcc \
-                                 --action_env=CXX=aarch64-linux-gnu-g++ \
-                                 --action_env=LD_LIBRARY_PATH=/usr/aarch64-linux-gnu/lib"
               ;;
             *)
               echo "Unknown ARCH '$ARCH'"
