@@ -17,8 +17,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        arch: [x86_64, x86_64_noavx]
-        python: ["3.9", "3.10", "3.11", "3.12"]
+        arch: [aarch64]
+        python: ["3.11"]
 #        arch: [x86_64, x86_64_noavx, aarch64]
 #        python: ["3.9", "3.10", "3.11", "3.12"]
     steps:
@@ -60,7 +60,7 @@ jobs:
           case "$ARCH" in
             x86_64) ARCH_FLAG="--cpu=k8";;
             x86_64_noavx) ARCH_FLAG="--cpu=core2 --copt=-mno-avx --copt=-mno-avx2 --copt=-msse4.2 --copt=-msse4.1";;
-            aarch64) ARCH_FLAG="--config=elinux_aarch64 --migrate";;
+            aarch64) ARCH_FLAG="-mavx -mavx2 -mfma -mfpmath=both -msse4.1 -msse4.2 --config=elinux_aarch64 --migrate";;
             *)
               echo "Warning: Unknown architecture '$ARCH'"
               exit 1
