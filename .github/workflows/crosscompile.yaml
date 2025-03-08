@@ -21,16 +21,6 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Debug Matrix
-        run: |
-          echo "Matrix Arch: ${{ matrix.arch }}"
-          echo "Matrix Python: ${{ matrix.python }}"
-
-      - name: Free up Disk Space
-        run: |
-          df -h
-          docker system prune -af || true  # No Docker usage, but sometimes there's leftover images
-
       - name: Build TFLite Runtime
         run: |
           set -eux
@@ -40,9 +30,10 @@ jobs:
           echo "Building TFLite Runtime for $ARCH / Python $PYTHON_VERSION"
 
           # ========== 1) Install System Dependencies ==========
+          sudo add-apt-repository ppa:deadsnakes/ppa          
           sudo apt-get update
           sudo apt-get install --no-install-recommends -y \
-            build-essential clang git zip unzip pkg-config curl \
+            python$PYTHON_VERSION build-essential clang git zip unzip pkg-config curl \
             python3-dev python3-venv
 
           # If cross-compiling for aarch64, install cross toolchain:
@@ -51,8 +42,6 @@ jobs:
           fi
 
           # ========== 2) Install Bazel ==========
-          # Use bazelisk as a stand-in for Bazel. We'll pick the right binary for x86_64.
-          # For aarch64 *cross-compilation*, we still run Bazel on x86_64 host – that's okay.
           sudo curl -sSL https://github.com/bazelbuild/bazelisk/releases/download/v1.25.0/bazelisk-linux-amd64 -o /usr/local/bin/bazel
           sudo chmod 777 /usr/local/bin/bazel
           echo "Bazel version is $(bazel --version)"
