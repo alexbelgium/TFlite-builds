@@ -15,7 +15,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        arch: [aarch64]
+        arch: [x86_64, x86_64_noavx, aarch64]
         python: ["3.11"]
     steps:
       - name: Check out repository
@@ -29,176 +29,111 @@ jobs:
       - name: Free up Disk Space
         run: |
           df -h
-          docker system prune -af
+          docker system prune -af || true  # No Docker usage, but sometimes there's leftover images
 
-      ################################################################
-      # x86_64 / x86_64_noavx – same Docker logic as before
-      ################################################################
-      - name: Run Build in Docker (x86_64)
-        if: matrix.arch == 'x86_64' || matrix.arch == 'x86_64_noavx'
+      - name: Build TFLite Runtime
         run: |
           set -eux
+
           ARCH="${{ matrix.arch }}"
           PYTHON_VERSION="${{ matrix.python }}"
-          echo "Building for architecture: $ARCH"
+          echo "Building TFLite Runtime for $ARCH / Python $PYTHON_VERSION"
 
-          DOCKER_IMG="python:${PYTHON_VERSION}-bookworm"
-          GLOBAL_FLAGS="--strip=always"
-
-          # Set architecture-specific build flags.
-          case "$ARCH" in
-            x86_64) ARCH_FLAG="--cpu=k8";;
-            x86_64_noavx) ARCH_FLAG="--cpu=core2 --copt=-mno-avx --copt=-mno-avx2 --copt=-msse4.2 --copt=-msse4.1";;
-          esac
-
-          # We'll just use --platform=linux/amd64 for x86_64 builds
-          PLATFORM_FLAG="--platform=linux/amd64"
-
-          docker run --rm --privileged $PLATFORM_FLAG \
-            -v $PWD:/work \
-            -w /work \
-            -e ARCH="$ARCH" \
-            -e PYTHON_VERSION="$PYTHON_VERSION" \
-            -e TFLITE_VERSION="$TFLITE_VERSION" \
-            -e ARCH_FLAG="$ARCH_FLAG" \
-            -e GLOBAL_FLAGS="$GLOBAL_FLAGS" \
-            --memory=8g --cpus=4 \
-            $DOCKER_IMG \
-            bash -c "
-              set -eux
-
-              echo \"STARTING BUILD: arch $ARCH, python $PYTHON_VERSION\"
-
-              # ========== 1) System Dependencies ==========
-              apt-get update
-              apt-get install --no-install-recommends -y build-essential clang git zip unzip pkg-config curl
-
-              # ========== 2) Install Bazel (x86_64) ==========
-              curl -sSL https://github.com/bazelbuild/bazelisk/releases/download/v1.25.0/bazelisk-linux-amd64 -o /usr/local/bin/bazel
-              chmod 777 /usr/local/bin/bazel
-              echo \"Bazel version: \$(bazel --version)\"
-
-              # ========== 3) Create and Activate Venv ==========
-              python -m venv /opt/tflite_env
-              source /opt/tflite_env/bin/activate
-              pip install --upgrade pip wheel numpy auditwheel setuptools
-
-              # ========== 4) Clone TensorFlow ==========
-              git clone https://github.com/tensorflow/tensorflow.git
-              cd tensorflow
-              git checkout tags/v\${TFLITE_VERSION}
-
-              # ========== 5) Build TFLite Runtime ==========
-              export CC=clang
-              export TF_PYTHON_VERSION=\${PYTHON_VERSION}
-              export PYTHON=/opt/tflite_env/bin/python
-              ./tensorflow/lite/tools/pip_package/build_pip_package_with_bazel.sh \
-                --define=tflite_enable_xnnpack=true \
-                --define=xnnpack_enable_subgraph_reshaping=true \
-                --define=no_tensorflow_py_deps=true \
-                \$ARCH_FLAG \
-                \$GLOBAL_FLAGS
-
-              # ========== 6) Rename Wheel and Copy Out ==========
-              mkdir -p /work/wheels
-              WHEEL_PATH=\$(find tensorflow/lite/tools/pip_package/gen/tflite_pip/python3/dist -name \"*.whl\" | head -n 1)
-              if [[ -z \"\$WHEEL_PATH\" ]]; then
-                echo \"Error: No wheel file found!\"
-                exit 1
-              fi
-              NEW_WHEEL_PATH=\"/work/wheels/tflite_runtime-\${TFLITE_VERSION}-\${PYTHON_VERSION}-linux_\${ARCH}.whl\"
-              mv \"\$WHEEL_PATH\" \"\$NEW_WHEEL_PATH\"
-              echo \"Created wheel: \$NEW_WHEEL_PATH\"
-            "
-
-      ################################################################
-      # aarch64 – brand-new cross-compilation logic on x86_64
-      ################################################################
-      - name: Cross-Compile on amd64 for aarch64
-        if: matrix.arch == 'aarch64'
-        run: |
-          set -eux
-          PYTHON_VERSION="${{ matrix.python }}"
-          ARCH="aarch64"
-          GLOBAL_FLAGS="--strip=always"
-          echo "Cross-compiling TFLite Runtime for ${ARCH} with Python ${PYTHON_VERSION}"
-
-          # (1) Install cross toolchain & clang
+          # ========== 1) Install System Dependencies ==========
           sudo apt-get update
           sudo apt-get install --no-install-recommends -y \
             build-essential clang git zip unzip pkg-config curl \
-            crossbuild-essential-arm64
+            python3-dev python3-venv
 
-          # (2) Install a Bazel binary or bazelisk for host (amd64)
-          sudo curl -sSL \
-            https://github.com/bazelbuild/bazelisk/releases/download/v1.25.0/bazelisk-linux-amd64 \
-            -o /usr/local/bin/bazel
+          # If cross-compiling for aarch64, install cross toolchain:
+          if [[ "$ARCH" == "aarch64" ]]; then
+            sudo apt-get install --no-install-recommends -y crossbuild-essential-arm64
+          fi
+
+          # ========== 2) Install Bazel ==========
+          # Use bazelisk as a stand-in for Bazel. We'll pick the right binary for x86_64.
+          # For aarch64 *cross-compilation*, we still run Bazel on x86_64 host – that's okay.
+          sudo curl -sSL https://github.com/bazelbuild/bazelisk/releases/download/v1.25.0/bazelisk-linux-amd64 -o /usr/local/bin/bazel
           sudo chmod 777 /usr/local/bin/bazel
           echo "Bazel version is $(bazel --version)"
 
-          # (3) Python environment on amd64
-          python -m venv /tmp/tflite_env
+          # ========== 3) Create and Activate Python Virtual Env ==========
+          python3 -m venv /tmp/tflite_env
           source /tmp/tflite_env/bin/activate
           pip install --upgrade pip wheel numpy auditwheel setuptools
 
-          # (4) Clone TensorFlow
+          # ========== 4) Clone TensorFlow ==========
           git clone https://github.com/tensorflow/tensorflow.git
           cd tensorflow
           git checkout tags/v${TFLITE_VERSION}
 
-          # (5) Set up environment for cross-compilation
-          #     Tweak these as needed for the correct crosstool paths, sysroot, etc.
-          export CC=aarch64-linux-gnu-gcc
-          export CXX=aarch64-linux-gnu-g++
-          export TF_PYTHON_VERSION=${PYTHON_VERSION}
+          # ========== 5) Architecture-specific Flags ==========
+          GLOBAL_FLAGS="--strip=always"
+          EXTRA_BAZEL_FLAGS=""
+
+          case "$ARCH" in
+            x86_64)
+              # Native x86_64 build
+              ARCH_FLAGS="--cpu=k8"
+              export CC=clang
+              export CXX=clang++
+              ;;
+            x86_64_noavx)
+              # Native x86_64 build but no AVX
+              ARCH_FLAGS="--cpu=core2 --copt=-mno-avx --copt=-mno-avx2 --copt=-msse4.2 --copt=-msse4.1"
+              export CC=clang
+              export CXX=clang++
+              ;;
+            aarch64)
+              # Cross-compile for aarch64
+              ARCH_FLAGS="--config=elinux_aarch64"
+              export CC=aarch64-linux-gnu-gcc
+              export CXX=aarch64-linux-gnu-g++
+              export LD_LIBRARY_PATH=/usr/aarch64-linux-gnu/lib
+              EXTRA_BAZEL_FLAGS="--action_env=CC=aarch64-linux-gnu-gcc --action_env=CXX=aarch64-linux-gnu-g++"
+              ;;
+            *)
+              echo "Unknown ARCH '$ARCH'"
+              exit 1
+              ;;
+          esac
+
+          echo "ARCH_FLAGS: $ARCH_FLAGS"
+          echo "EXTRA_BAZEL_FLAGS: $EXTRA_BAZEL_FLAGS"
+
+          # ========== 6) Build the TFLite Runtime ==========
+          export TF_PYTHON_VERSION="$PYTHON_VERSION"
           export PYTHON=$(which python)
-          export LD_LIBRARY_PATH=/usr/aarch64-linux-gnu/lib
-          
-          # Optionally define a custom --crosstool_top or --config for your aarch64 cross toolchain:
-          # But TensorFlow's build supports a pre-defined "elinux_aarch64" config if you set the right environment.
-
-          # Example: override Bazel flags for cross
-          BAZEL_FLAGS="
-            --config=elinux_aarch64
-            ${GLOBAL_FLAGS}
-            --action_env=CC=aarch64-linux-gnu-gcc
-            --action_env=CXX=aarch64-linux-gnu-g++
-            --copt=-O3
-          "
-
-          # (6) Run the TFLite build script but pass cross-compile flags
-          chmod +x ./tensorflow/lite/tools/pip_package/build_pip_package_with_bazel.sh
           ./tensorflow/lite/tools/pip_package/build_pip_package_with_bazel.sh \
             --define=tflite_enable_xnnpack=true \
             --define=xnnpack_enable_subgraph_reshaping=true \
             --define=no_tensorflow_py_deps=true \
-            ${BAZEL_FLAGS}
+            $ARCH_FLAGS \
+            $GLOBAL_FLAGS \
+            $EXTRA_BAZEL_FLAGS
 
-          # (7) Rename and store the wheel
+          # ========== 7) Locate and Rename the Wheel ==========
           mkdir -p /home/runner/work/wheels
           WHEEL_PATH=$(find tensorflow/lite/tools/pip_package/gen/tflite_pip/python3/dist -name "*.whl" | head -n 1)
           if [[ -z "$WHEEL_PATH" ]]; then
-            echo "Error: No wheel file found for aarch64!"
+            echo "Error: No wheel file found!"
             exit 1
           fi
           NEW_WHEEL_PATH="/home/runner/work/wheels/tflite_runtime-${TFLITE_VERSION}-${PYTHON_VERSION}-linux_${ARCH}.whl"
           mv "$WHEEL_PATH" "$NEW_WHEEL_PATH"
-          echo "Cross-compiled wheel: $NEW_WHEEL_PATH"
-
-      - name: Clean up Docker
-        run: docker system prune -af
+          echo "Wheel created: $NEW_WHEEL_PATH"
 
       - name: List Built Wheels
-        run: ls -l **/wheels
+        run: ls -l /home/runner/work/wheels
 
-      - name: Verify Wheel Architectures
-        run: file **/wheels/*.whl
+      - name: Verify Wheel Architecture
+        run: file /home/runner/work/wheels/*.whl
 
       - name: Upload Wheel Artifact
         uses: actions/upload-artifact@v4
         with:
           name: tflite_runtime-${{ env.TFLITE_VERSION }}-${{ matrix.arch }}-py${{ matrix.python }}
-          path: "**/wheels/*.whl"
+          path: /home/runner/work/wheels/*.whl
 
   release:
     runs-on: ubuntu-latest
