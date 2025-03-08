@@ -120,16 +120,7 @@ jobs:
               apt-get install --no-install-recommends -y build-essential clang git zip unzip pkg-config curl # python3-pygments python3-pkg-resources
 
               # ========== 2) Install Stable Bazel Version ==========
-              case \"$ARCH\" in
-                x86_64*) curl -sSL https://github.com/bazelbuild/bazelisk/releases/download/v1.25.0/bazelisk-linux-amd64 -o /usr/local/bin/bazel;;
-                aarch64) curl -sSL https://github.com/bazelbuild/bazelisk/releases/download/v1.22.0/bazelisk-linux-arm64 -O && mv bazelisk-linux-arm64 /usr/local/bin/bazel
-                  export TENSORFLOW_TARGET=\"aarch64\"
-                  ;;
-                *)
-                  echo \"Warning: Unknown architecture '$ARCH'\"
-                  exit 1
-                  ;;
-              esac
+              curl -sSL https://github.com/bazelbuild/bazelisk/releases/download/v1.25.0/bazelisk-linux-amd64 -o /usr/local/bin/bazel
 
               # Add permissions
               chmod 777 /usr/local/bin/bazel
@@ -158,6 +149,8 @@ jobs:
               export PYTHON=/opt/tflite_env/bin/python
               export BAZELISK_CACHE=/tmp/bazelisk_cache
               mkdir -p /tmp/bazelisk_cache
+
+              if [ "$(ARCH_VERSION) == "aarch64" ] ; then TENSORFLOW_TARGET=aarch64; fi
 
               ./tensorflow/lite/tools/pip_package/build_pip_package_with_bazel.sh \
                 --define=tflite_enable_xnnpack=true \
