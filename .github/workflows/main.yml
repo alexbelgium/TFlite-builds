@@ -118,7 +118,7 @@ jobs:
               # ========== 1) Install System Dependencies ==========
               apt-get update
               export DEBIAN_FRONTEND=noninteractive
-              apt-get install --no-install-recommends -y build-essential clang git zip unzip pkg-config curl # python3-pygments python3-pkg-resources
+              apt-get install --no-install-recommends -y build-essential clang-18 git zip unzip pkg-config curl # python3-pygments python3-pkg-resources
 
               # ========== 2) Install Stable Bazel Version ==========
               curl -sSL https://github.com/bazelbuild/bazelisk/releases/download/v1.25.0/bazelisk-linux-amd64 -o /usr/local/bin/bazel
