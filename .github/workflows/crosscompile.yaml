@@ -81,14 +81,21 @@ jobs:
               export LD_LIBRARY_PATH=/usr/aarch64-linux-gnu/lib
               EXTRA_BAZEL_FLAGS="--action_env=CC=aarch64-linux-gnu-gcc --action_env=CXX=aarch64-linux-gnu-g++"
 
-              echo "DEBUG sse"
-              sed -i "/msse/d" tensorflow/lite/build_def.bzl
+              if [ -f tensorflow/lite/build_def.bzl ]; then
+                echo "tensorflow/lite/build_def.bzl exists"
+                sed -i "s|\"-msse4.1\"|\"\"|g" tensorflow/lite/build_def.bzl
+              else
+                echo "no tensorflow/lite/build_def.bzl exists"
+              fi
 
-              echo "DEBUG .bazelrc"
-              cat .bazelrc
-              sed -i '/--copt=-msse4.2/d' .bazelrc
-              sed -i '/--copt=-msse4.1/d' .bazelrc
-              sed -i '/--copt=-mavx/d' .bazelrc
+              if [ -f ".bazelrc" ]; then
+                sed -i '/--copt=-msse4.2/d' .bazelrc
+                sed -i '/--copt=-msse4.1/d' .bazelrc
+                sed -i '/--copt=-mavx/d' .bazelrc
+                echo ".bazelrc exists"
+              else
+                echo "no .bazelrc exists"
+              fi
               ;;
             *)
               echo "Unknown ARCH '$ARCH'"
