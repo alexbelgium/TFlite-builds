@@ -10,7 +10,7 @@ permissions:
 
 env:
   TFLITE_VERSION: "2.17.1"
-  USE_BAZEL_VERSION: "7.5.1"
+  USE_BAZEL_VERSION: "8.*"
 
 jobs:
   build-tflite-runtime:
