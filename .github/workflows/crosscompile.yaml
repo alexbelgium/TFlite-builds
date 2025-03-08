@@ -1,4 +1,4 @@
-name: publish-tflite-runtime-wheels
+name: cross_compilation
 
 on:
   workflow_dispatch:
@@ -11,7 +11,7 @@ env:
 
 jobs:
   build-tflite-runtime:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
@@ -51,9 +51,11 @@ jobs:
           # ========== 1) Install System Dependencies ==========
           sudo add-apt-repository ppa:deadsnakes/ppa
           sudo apt-get update
+          # Use Clang (and Clang++), remove direct gcc/g++ unless needed for cross-compile
           sudo apt-get install --no-install-recommends -y \
-            python$PYTHON_VERSION build-essential clang clang gcc g++ gcc-aarch64-linux-gnu git zip unzip pkg-config curl \
-            python$PYTHON_VERSION-dev python$PYTHON_VERSION-venv
+            python$PYTHON_VERSION build-essential clang clang++ lld git zip unzip pkg-config curl \
+            python$PYTHON_VERSION-dev python$PYTHON_VERSION-venv \
+            gcc-aarch64-linux-gnu # Keep cross-compiler if you need it for aarch64 linking
 
           # ========== 2) Install Bazel (x86_64 binary is fine; we just pass cross-compilation flags) ==========
           sudo curl -sSL https://github.com/bazelbuild/bazelisk/releases/download/v1.24.1/bazelisk-linux-amd64 -o /usr/local/bin/bazel
@@ -84,7 +86,6 @@ jobs:
             aarch64)
               # Enforce cross-compilation settings
               ARCH_FLAGS="--config=elinux_aarch64"
-              #export TENSORFLOW_TARGET="aarch64"
               ;;
             *)
               echo "Unknown ARCH '$ARCH'"
@@ -95,12 +96,25 @@ jobs:
           echo "ARCH_FLAGS: $ARCH_FLAGS"
           echo "EXTRA_BAZEL_FLAGS: $EXTRA_BAZEL_FLAGS"
 
-          # ========== 6) Build the TFLite Runtime ==========
+          # ========== 6) Use Clang as compiler ==========
+          export CC=clang
+          export CXX=clang++
+          # Optionally add:
+          # EXTRA_BAZEL_FLAGS+=" --compiler=clang"
+
+          # ========== 7) Build the TFLite Runtime ==========
           export TF_PYTHON_VERSION="$PYTHON_VERSION"
           export PYTHON=$(which python)
-          ./tensorflow/lite/tools/pip_package/build_pip_package_with_bazel.sh $ARCH_FLAGS --define=tflite_enable_xnnpack=true --define=xnnpack_enable_subgraph_reshaping=true --define=no_tensorflow_py_deps=true $GLOBAL_FLAGS $EXTRA_BAZEL_FLAGS --verbose_failures --announce_rc
+          ./tensorflow/lite/tools/pip_package/build_pip_package_with_bazel.sh \
+            $ARCH_FLAGS \
+            --define=tflite_enable_xnnpack=true \
+            --define=xnnpack_enable_subgraph_reshaping=true \
+            --define=no_tensorflow_py_deps=true \
+            $GLOBAL_FLAGS \
+            $EXTRA_BAZEL_FLAGS \
+            --verbose_failures --announce_rc
 
-          # ========== 7) Locate and Rename the Wheel ==========
+          # ========== 8) Locate and Rename the Wheel ==========
           mkdir -p /home/runner/work/wheels
           WHEEL_PATH=$(find tensorflow/lite/tools/pip_package/gen/tflite_pip/python3/dist -name "*.whl" | head -n 1)
           if [[ -z "$WHEEL_PATH" ]]; then
@@ -115,13 +129,13 @@ jobs:
         run: ls -l /home/runner/work/wheels
 
       - name: Verify Wheel Architectures
-        run: file wheels/*.whl
+        run: file /home/runner/work/wheels/*.whl
 
       - name: Upload Wheel Artifact
         uses: actions/upload-artifact@v4
         with:
           name: tflite_runtime-${{ env.tflite_version }}-cp${{ env.python_version }}-cp${{ env.python_version }}-linux_${{ env.arch_version }}
-          path: wheels/*.whl
+          path: /home/runner/work/wheels/*.whl
 
   release:
     runs-on: ubuntu-latest
