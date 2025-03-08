@@ -17,8 +17,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        arch: [aarch64]
-        python: ["3.11"]
+        arch: [x86_64, x86_64_noavx]
+        python: ["3.9", "3.10", "3.11", "3.12"]
 #        arch: [x86_64, x86_64_noavx, aarch64]
 #        python: ["3.9", "3.10", "3.11", "3.12"]
     steps:
@@ -203,10 +203,10 @@ jobs:
             --title "tflite_runtime ${{ env.TFLITE_VERSION }}" \
             --notes "Automated build for tflite_runtime ${{ env.TFLITE_VERSION }}"
         env:
-          GITHUB_TOKEN: \${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload Wheels to GitHub Release
         run: |
-          gh release upload \${{ env.TFLITE_VERSION }} wheels/**/*.whl --clobber -R "\${{ github.repository }}"
+          gh release upload ${{ env.TFLITE_VERSION }} wheels/**/*.whl --clobber -R "${{ github.repository }}"
         env:
           GITHUB_TOKEN: \${{ secrets.GITHUB_TOKEN }}
