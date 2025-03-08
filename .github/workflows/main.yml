@@ -86,7 +86,7 @@ jobs:
             -e PYTHON_VERSION="$PYTHON_VERSION" \
             -e ARCH_FLAG="$ARCH_FLAG" \
             -e GLOBAL_FLAGS="$GLOBAL_FLAGS" \
-            -e USE_BAZEL_VERSION="$USE_BAZEL_VERSION" \
+            #-e USE_BAZEL_VERSION="$USE_BAZEL_VERSION" \
             --memory=8g --cpus=4 \
             $DOCKER_IMG \
             bash -c "
