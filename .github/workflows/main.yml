@@ -42,6 +42,26 @@ jobs:
           sudo apt-get install -y qemu-user-static binfmt-support
           docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
 
+      - name: Prepare Namings
+        id: prepare_names
+        run: |
+          echo "python_version=${{ matrix.python }}" | sed 's/\.//g' >> $GITHUB_ENV
+          case "${{ matrix.arch }}" in
+            x86_64|aarch64)
+              echo "tflite_version=${TFLITE_VERSION}" >> $GITHUB_ENV
+              echo "arch_version=${{ matrix.arch }}" >> $GITHUB_ENV
+            ;;
+            x86_64_noavx)
+              echo "tflite_version=${TFLITE_VERSION}_noavx" >> $GITHUB_ENV
+              echo "arch_version=x86_64" >> $GITHUB_ENV
+            ;;
+            *)
+              echo "Warning: Unknown architecture $ARCH"
+              exit 1
+            ;;
+          esac
+
+
       - name: Run Build in Container
         run: |
           set -eux
@@ -82,7 +102,9 @@ jobs:
             -w /work \
             -e ARCH="$ARCH" \
             -e PYTHON_VERSION="$PYTHON_VERSION" \
-            -e TFLITE_VERSION="$TFLITE_VERSION" \
+            -e TFLITE_VERSION="${{ env.TFLITE_VERSION }}" \
+            -e TFLITE_VERSION_NAME="${{ env.tflite_version }}" \
+            -e ARCH_VERSION="${{ env.arch_version }}" \
             -e ARCH_FLAG="$ARCH_FLAG" \
             -e GLOBAL_FLAGS="$GLOBAL_FLAGS" \
             --memory=8g --cpus=4 \
@@ -152,8 +174,7 @@ jobs:
 
               echo \"Found wheel: \$WHEEL_PATH\"
 
-              # Generate new filename: tflite_runtime-{TFLITE_VERSION}-{PYTHON_VERSION}-linux_{ARCH}.whl
-              NEW_WHEEL_PATH="/work/wheels/tflite_runtime-${TFLITE_VERSION}-cp${PYTHON_VERSION//./}-cp${PYTHON_VERSION//./}-linux_${ARCH}.whl"
+              NEW_WHEEL_PATH="/work/wheels/tflite_runtime-${tflite_version}-cp${PYTHON_VERSION//./}-cp${PYTHON_VERSION//./}-linux_${arch_version}.whl"
               mv \"\$WHEEL_PATH\" \"\$NEW_WHEEL_PATH\"
 
               echo \"Renamed wheel to: \$NEW_WHEEL_PATH\"
@@ -168,14 +189,10 @@ jobs:
       - name: Verify Wheel Architectures
         run: file wheels/*.whl
 
-      - name: Prepare Python Version
-        id: prepare_python_version
-        run: echo "python_version=${{ matrix.python }}" | sed 's/\.//g' >> $GITHUB_ENV
-      
       - name: Upload Wheel Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: tflite_runtime-${{ env.TFLITE_VERSION }}-cp${{ env.python_version }}-cp${{ env.python_version }}-linux_${{ matrix.arch }}
+          name: tflite_runtime-${{ env.tflite_version }}-cp${{ env.python_version }}-cp${{ env.python_version }}-linux_${{ env.arch_version }}
           path: wheels/*.whl
 
   release:
