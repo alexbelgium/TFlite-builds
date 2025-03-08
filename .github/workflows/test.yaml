@@ -1,0 +1,143 @@
+name: publish-tflite-runtime-wheels
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+
+env:
+  TFLITE_VERSION: "2.17.1"
+  PYTHON_VERSION: "3.11"
+
+jobs:
+  build-tflite-runtime:
+    runs-on: ubuntu-latest
+    name: Build TFLite Runtime wheels
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            docker_img: debian:bookworm
+            arch_flag: "--cpu=k8"
+            avx: false
+          - arch: aarch64
+            docker_img: debian:bookworm
+            arch_flag: "--cpu=aarch64"
+            avx: false
+          - arch: x86_64_noavx
+            docker_img: debian:bookworm
+            arch_flag: "--cpu=core2 --copt=-mno-avx --copt=-mno-avx2 --copt=-msse4.2 --copt=-msse4.1"
+            avx: true
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Run Build in Debian Bookworm Container
+        run: |
+          docker run --rm --privileged \
+            -v $PWD:/work \
+            -w /work \
+            ${{ matrix.docker_img }} \
+            bash -c "
+              set -eux
+
+              # ========== 1) Install System Dependencies ==========
+              apt-get update
+              apt-get install -y build-essential python${PYTHON_VERSION} python${PYTHON_VERSION}-venv \
+                                 python${PYTHON_VERSION}-dev clang git zip unzip pkg-config curl
+
+              # Install Bazelisk (to fetch Bazel automatically)
+              curl -sSL https://github.com/bazelbuild/bazelisk/releases/download/v1.17.0/bazelisk-linux-amd64 -o /usr/local/bin/bazel
+              chmod +x /usr/local/bin/bazel
+
+              # ========== 2) Create and Activate a Virtual Environment ==========
+              python${PYTHON_VERSION} -m venv /opt/tflite_env
+              source /opt/tflite_env/bin/activate
+
+              # Upgrade pip and install required Python packages inside the venv
+              pip install --upgrade pip wheel numpy auditwheel
+
+              # ========== 3) Clone TensorFlow v2.17.1 ==========
+              git clone https://github.com/tensorflow/tensorflow.git
+              cd tensorflow
+              git checkout tags/v${TFLITE_VERSION}
+
+              # ========== 4) Build TFLite Runtime ==========
+              export CC=clang
+              export TF_PYTHON_VERSION=${PYTHON_VERSION}
+              export PYTHON=/opt/tflite_env/bin/python
+
+              ./tensorflow/lite/tools/pip_package/build_pip_package_with_bazel.sh native \
+                --define=tflite_enable_xnnpack=true \
+                --define=xnnpack_enable_subgraph_reshaping=true \
+                --define=no_tensorflow_py_deps=true \
+                --define=tflite_enable_select_tf_ops=true \
+                ${{ matrix.arch_flag }}
+
+              # ========== 5) Locate and Process the Built Wheel ==========
+              mkdir -p /work/wheels
+              WHEEL_PATH=\$(find tensorflow/lite/tools/pip_package/gen/tflite_pip/python3/dist -name \"*.whl\" | head -n 1)
+
+              if [[ -z \"\$WHEEL_PATH\" ]]; then
+                echo \"Error: No wheel file found!\"
+                exit 1
+              fi
+
+              echo \"Found wheel: \$WHEEL_PATH\"
+
+              # ========== 6) Attempt to Auditwheel Repair ==========
+              if auditwheel repair \"\$WHEEL_PATH\" -w /work/wheels; then
+                echo \"auditwheel repair succeeded.\"
+              else
+                echo \"auditwheel repair failed, copying original wheel.\"
+                cp \"\$WHEEL_PATH\" /work/wheels/
+              fi
+            "
+
+      - name: List Built Wheels
+        run: ls -l wheels
+
+      - name: Upload Wheel Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tflite_runtime-${{ env.TFLITE_VERSION }}-${{ matrix.arch }}
+          path: wheels/*.whl
+
+  release:
+    runs-on: ubuntu-latest
+    needs: build-tflite-runtime
+    name: Create and Upload Release
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Download All Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: wheels
+
+      - name: List Downloaded Wheels
+        run: find wheels
+
+      - name: Authenticate GitHub CLI
+        run: gh auth status
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create GitHub Release (if not exists)
+        run: |
+          gh release view ${{ env.TFLITE_VERSION }} -R "${{ github.repository }}" > /dev/null 2>&1 || \
+          gh release create ${{ env.TFLITE_VERSION }} \
+            -R "${{ github.repository }}" \
+            --title "tflite_runtime ${{ env.TFLITE_VERSION }}" \
+            --notes "Automated build for tflite_runtime ${{ env.TFLITE_VERSION }}"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload Wheels to GitHub Release
+        run: |
+          gh release upload ${{ env.TFLITE_VERSION }} wheels/**/*.whl --clobber -R "${{ github.repository }}"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
