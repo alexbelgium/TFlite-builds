@@ -80,6 +80,21 @@ jobs:
               export CXX=aarch64-linux-gnu-g++
               export LD_LIBRARY_PATH=/usr/aarch64-linux-gnu/lib
               EXTRA_BAZEL_FLAGS="--action_env=CC=aarch64-linux-gnu-gcc --action_env=CXX=aarch64-linux-gnu-g++"
+
+              echo "DEBUG sse"
+              sed -i "/msse/d" tensorflow/compiler/mlir/lite/build_def.bzl || echo "tensorflow/compiler/mlir/lite/build_def.bzl not found"
+              sed -i "/msse/d" tensorflow/lite/build_def.bzl || echo "tensorflow/lite/build_def.bzl not found"
+              sed -i "/msse/d" compiler/mlir/lite/build_def.bzl || echo "compiler/mlir/lite/build_def.bzl not found"
+              sed -i "/msse/d" lite/build_def.bzl || echo "lite/build_def.bzl not found"
+
+              echo "DEBUG .bazelrc"
+              find / -name ".bazelrc" 2/dev/null
+              if [ -f .bazelrc ]; then
+                cat .bazelrc
+                sed -i '/--copt=-msse4.2/d' .bazelrc
+                sed -i '/--copt=-msse4.1/d' .bazelrc
+                sed -i '/--copt=-mavx/d' .bazelrc
+              fi
               ;;
             *)
               echo "Unknown ARCH '$ARCH'"
@@ -97,16 +112,7 @@ jobs:
             --define=tflite_enable_xnnpack=true \
             --define=xnnpack_enable_subgraph_reshaping=true \
             --define=no_tensorflow_py_deps=true \
-            --config=elinux_aarch64 --copt=-mavx --copt=-mavx2 --copt=-mfma --copt=-mfpmath=both --copt=-msse4.1 --copt=-msse4.2" \
-            $GLOBAL_FLAGS \
-            $EXTRA_BAZEL_FLAGS || echo "THIS FAILED MISERABLY"
-
-          export PYTHON=$(which python)
-          ./tensorflow/lite/tools/pip_package/build_pip_package_with_bazel.sh \
-            --define=tflite_enable_xnnpack=true \
-            --define=xnnpack_enable_subgraph_reshaping=true \
-            --define=no_tensorflow_py_deps=true \
-            --config=elinux_aarch64 -mavx -mavx2 -mfma -mfpmath=both -msse4.1 -msse4.2" \
+            --config=elinux_aarch64" \
             $GLOBAL_FLAGS \
             $EXTRA_BAZEL_FLAGS
 
