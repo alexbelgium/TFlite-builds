@@ -171,8 +171,7 @@ jobs:
       - name: Upload Wheel Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: tflite_runtime-${{ env.TFLITE_VERSION }}-cp${{ matrix.python // '.' }}-cp${{ matrix.python // '.' }}-linux_${{ matrix.arch }}
-          path: wheels/*.whl
+          name: tflite_runtime-${{ env.TFLITE_VERSION }}-cp${{ matrix.python.replace('.', '') }}-cp${{ matrix.python.replace('.', '') }}-linux_${{ matrix.arch }}
 
   release:
     runs-on: ubuntu-latest
