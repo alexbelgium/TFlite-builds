@@ -135,12 +135,19 @@ jobs:
           export TF_PYTHON_VERSION="$PYTHON_VERSION"
           export PYTHON=$(which python)
           ./tensorflow/lite/tools/pip_package/build_pip_package_with_bazel.sh \
+            -config=elinux_aarch64 --cpu=aarch64 --copt=-mno-avx --copt=-mno-avx2 --copt=-msse4.2 --copt=-msse4.1 \
             --define=tflite_enable_xnnpack=true \
             --define=xnnpack_enable_subgraph_reshaping=true \
             --define=no_tensorflow_py_deps=true \
-            $ARCH_FLAGS \
             $GLOBAL_FLAGS \
             $EXTRA_BAZEL_FLAGS \
+            --verbose_failures \
+            --announce_rc || true
+          echo "DEBUG try"
+          ./tensorflow/lite/tools/pip_package/build_pip_package_with_bazel.sh \
+            -config=elinux_aarch64 \
+            --define=tflite_enable_xnnpack=true \
+            --define=xnnpack_enable_subgraph_reshaping=true \
             --verbose_failures \
             --announce_rc
 
