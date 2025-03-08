@@ -52,7 +52,7 @@ jobs:
           sudo add-apt-repository ppa:deadsnakes/ppa
           sudo apt-get update
           sudo apt-get install --no-install-recommends -y \
-            python$PYTHON_VERSION build-essential clang-18 gcc-12 g++-12 git zip unzip pkg-config curl \
+            python$PYTHON_VERSION build-essential clang gcc-12 g++-12 git zip unzip pkg-config curl \
             python$PYTHON_VERSION-dev python$PYTHON_VERSION-venv
 
           # ========== 2) Install Bazel (x86_64 binary is fine; we just pass cross-compilation flags) ==========
