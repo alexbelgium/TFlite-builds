@@ -52,16 +52,15 @@ jobs:
           sudo add-apt-repository ppa:deadsnakes/ppa
           sudo apt-get update
           # Use Clang (and Clang++), remove direct gcc/g++ unless needed for cross-compile
-          sudo apt-get remove -y --purge libopencl-clang-14-dev libopencl-clang-15-dev python3-clang-13 python3-clang-14 python3-clang-15 python3-clang-16 python3-clang-19 || true
-          sudo apt-get autoremove -y
           sudo apt-get install -y \
-            python$PYTHON_VERSION build-essential clang clang++ lld git zip unzip pkg-config curl \
+            python$PYTHON_VERSION build-essential lld git zip unzip pkg-config curl \
             python$PYTHON_VERSION-dev python$PYTHON_VERSION-venv \
             gcc-aarch64-linux-gnu # Keep cross-compiler if you need it for aarch64 linking
 
           # ========== 2) Install Bazel (x86_64 binary is fine; we just pass cross-compilation flags) ==========
+          apt-get install -y bazelisk || \
           sudo curl -sSL https://github.com/bazelbuild/bazelisk/releases/download/v1.24.1/bazelisk-linux-amd64 -o /usr/local/bin/bazel
-          sudo chmod 777 /usr/local/bin/bazel
+          sudo chmod 777 /usr/local/bin/bazel || true
           echo "Bazel version is $(bazel --version)"
 
           # ========== 3) Create and Activate Python Virtual Env ==========
