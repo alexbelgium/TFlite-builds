@@ -125,13 +125,6 @@ jobs:
             $GLOBAL_FLAGS \
             $EXTRA_BAZEL_FLAGS \
             --verbose_failures \
-            --announce_rc || true
-          echo "DEBUG try"
-          ./tensorflow/lite/tools/pip_package/build_pip_package_with_bazel.sh \
-            $ARCH_FLAGS \
-            --define=tflite_enable_xnnpack=true \
-            --define=xnnpack_enable_subgraph_reshaping=true \
-            --verbose_failures \
             --announce_rc
 
           # ========== 7) Locate and Rename the Wheel ==========
