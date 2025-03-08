@@ -80,7 +80,7 @@ jobs:
           case "$ARCH" in
             x86_64) ARCH_FLAG="--cpu=k8";;
             x86_64_noavx) ARCH_FLAG="--cpu=core2 --copt=-mno-avx --copt=-mno-avx2 --copt=-msse4.2 --copt=-msse4.1";;
-            aarch64) ARCH_FLAG="-mavx -mavx2 -mfma -mfpmath=both -msse4.1 -msse4.2 --config=elinux_aarch64 --migrate";;
+            aarch64) ARCH_FLAG="--config=elinux_aarch64";;
             *)
               echo "Warning: Unknown architecture '$ARCH'"
               exit 1
@@ -122,7 +122,10 @@ jobs:
               # ========== 2) Install Stable Bazel Version ==========
               case \"$ARCH\" in
                 x86_64*) curl -sSL https://github.com/bazelbuild/bazelisk/releases/download/v1.25.0/bazelisk-linux-amd64 -o /usr/local/bin/bazel;;
-                aarch64) curl -sSL \"https://github.com/bazelbuild/bazel/releases/download/7.5.0/bazel-7.5.0-linux-arm64\" -o /usr/local/bin/bazel;;
+                aarch64) 
+                  curl -sSL https://github.com/bazelbuild/bazelisk/releases/download/v1.25.0/bazelisk-linux-amd64 -o /usr/local/bin/bazel
+                  export TENSORFLOW_TARGET="aarch64"
+                  ;;
                 *)
                   echo \"Warning: Unknown architecture '$ARCH'\"
                   exit 1
@@ -150,7 +153,8 @@ jobs:
               git checkout tags/v\${TFLITE_VERSION}
 
               # ========== 6) Build TFLite Runtime ==========
-              export CC=clang
+              # export CC=clang
+              export CC=gcc
               export TF_PYTHON_VERSION=\${PYTHON_VERSION}
               export PYTHON=/opt/tflite_env/bin/python
               export BAZELISK_CACHE=/tmp/bazelisk_cache
@@ -160,9 +164,21 @@ jobs:
                 --define=tflite_enable_xnnpack=true \
                 --define=xnnpack_enable_subgraph_reshaping=true \
                 --define=no_tensorflow_py_deps=true \
+                --jobs=2 \
                 \$ARCH_FLAG \
                 \$GLOBAL_FLAGS \
-                --verbose_failures
+                --verbose_failures || true
+
+              echo "TRYING WITH CLANG"
+              export CC=clang
+              ./tensorflow/lite/tools/pip_package/build_pip_package_with_bazel.sh \
+                --define=tflite_enable_xnnpack=true \
+                --define=xnnpack_enable_subgraph_reshaping=true \
+                --define=no_tensorflow_py_deps=true \
+                --jobs=2 \
+                \$ARCH_FLAG \
+                \$GLOBAL_FLAGS \
+                --verbose_failures || true
 
               # ========== 7) Locate and Rename the Built Wheel ==========
               mkdir -p /work/wheels
