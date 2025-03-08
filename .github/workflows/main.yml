@@ -17,8 +17,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        arch: [aarch64]
-        python: ["3.11"]
+        arch: [x86_64, x86_64_noavx]
+        python: ["3.9", "3.10", "3.11", "3.12"]
 #        arch: [x86_64, x86_64_noavx, aarch64]
 #        python: ["3.9", "3.10", "3.11", "3.12"]
     steps:
@@ -171,7 +171,7 @@ jobs:
       - name: Upload Wheel Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: tflite_runtime-\${{ env.TFLITE_VERSION }}-\${{ matrix.arch }}-py\${{ matrix.python }}
+          name: tflite_runtime-${{ env.TFLITE_VERSION }}-${{ matrix.arch }}-py${{ matrix.python }}
           path: wheels/*.whl
 
   release:
@@ -197,11 +197,11 @@ jobs:
 
       - name: Create GitHub Release (if not exists)
         run: |
-          gh release view \${{ env.TFLITE_VERSION }} -R "\${{ github.repository }}" > /dev/null 2>&1 || \
-          gh release create \${{ env.TFLITE_VERSION }} \
-            -R "\${{ github.repository }}" \
-            --title "tflite_runtime \${{ env.TFLITE_VERSION }}" \
-            --notes "Automated build for tflite_runtime \${{ env.TFLITE_VERSION }}"
+          gh release view ${{ env.TFLITE_VERSION }} -R "${{ github.repository }}" > /dev/null 2>&1 || \
+          gh release create ${{ env.TFLITE_VERSION }} \
+            -R "${{ github.repository }}" \
+            --title "tflite_runtime ${{ env.TFLITE_VERSION }}" \
+            --notes "Automated build for tflite_runtime ${{ env.TFLITE_VERSION }}"
         env:
           GITHUB_TOKEN: \${{ secrets.GITHUB_TOKEN }}
 
