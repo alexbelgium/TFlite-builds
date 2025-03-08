@@ -63,7 +63,7 @@ jobs:
           case "$ARCH" in
             x86_64) ARCH_FLAG="--cpu=k8";;
             x86_64_noavx) ARCH_FLAG="--cpu=core2 --copt=-mno-avx --copt=-mno-avx2 --copt=-msse4.2 --copt=-msse4.1";;
-            aarch64) ARCH_FLAG="--config=elinux_aarch64 --migrate";;
+            aarch64) ARCH_FLAG="--config=elinux_aarch64";;
             *)
               echo "Warning: Unknown architecture '$ARCH'"
               exit 1
