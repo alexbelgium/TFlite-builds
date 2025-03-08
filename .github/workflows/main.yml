@@ -113,8 +113,8 @@ jobs:
               echo \"Bazel version is $(bazel --version)\"
 
               # ========== 3) Set up Bazel Cache Permissions ==========
-              #mkdir -p /root/.cache/bazel
-              #chmod -R u+rw /root/.cache/bazel
+              mkdir -p /root/.cache/bazel
+              chmod -R u+rw /root/.cache/bazel
 
               # ========== 4) Create and Activate Virtual Environment ==========
               python -m venv /opt/tflite_env
