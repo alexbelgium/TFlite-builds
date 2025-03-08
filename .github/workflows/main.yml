@@ -127,14 +127,17 @@ jobs:
                 pkg-config \
                 curl
 
-              # ========== 2) Install Bazel Using Bazelisk ==========
-              if command -v bazelisk >/dev/null 2>&1; then
-                echo \"Bazelisk already installed.\"
+              # ========== 2) Install Stable Bazel Version ==========
+              if [[ \"\${ARCH_VERSION}\" == \"aarch64\" ]]; then
+                BAZEL_ARCH=arm64
               else
-                apt-get install -y bazelisk
-                ln -s /usr/bin/bazelisk /usr/local/bin/bazel
+                BAZEL_ARCH=amd64
               fi
+              curl -sSL https://github.com/bazelbuild/bazelisk/releases/download/v1.24.1/bazelisk-linux-\$BAZEL_ARCH -o /usr/local/bin/bazel
+              #export USE_BAZEL_VERSION="7.5.0"
 
+              # Add permissions
+              chmod 777 /usr/local/bin/bazel
               echo \"Bazel version is \$(bazel --version)\"
 
               # ========== 3) Create and Activate Virtual Environment ==========
