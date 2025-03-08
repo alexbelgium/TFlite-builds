@@ -59,6 +59,8 @@ jobs:
           if [[ "$ARCH" == "aarch64" ]]; then
             sudo dpkg --add-architecture arm64
             sudo apt-get update
+            sudo sed -i 's|http://security.ubuntu.com/ubuntu|http://ports.ubuntu.com/ubuntu-ports|g' /etc/apt/sources.list
+            sudo sed -i 's|http://archive.ubuntu.com/ubuntu|http://ports.ubuntu.com/ubuntu-ports|g' /etc/apt/sources.list
             sudo apt-get install --no-install-recommends -y crossbuild-essential-arm64 python$PYTHON_VERSION-dev:arm64 python$PYTHON_VERSION-venv:arm64
           fi
 
