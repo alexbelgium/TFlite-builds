@@ -137,7 +137,6 @@ jobs:
                 --define=tflite_enable_xnnpack=true \
                 --define=xnnpack_enable_subgraph_reshaping=true \
                 --define=no_tensorflow_py_deps=true \
-                --migrate \
                 $ARCH_FLAG \
                 $GLOBAL_FLAGS
 
