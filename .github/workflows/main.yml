@@ -101,13 +101,16 @@ jobs:
               # ========== 2) Install Stable Bazel Version ==========
               case \"$ARCH\" in
                 x86_64*) curl -sSL https://github.com/bazelbuild/bazelisk/releases/download/v1.25.0/bazelisk-linux-amd64 -o /usr/local/bin/bazel;;
-                aarch64) curl -sSL https://github.com/bazelbuild/bazelisk/releases/download/v1.22.0/bazelisk-linux-arm64 -o /usr/local/bin/bazel;;
+                aarch64) curl -sSL "https://github.com/bazelbuild/bazel/releases/download/6.5.0/bazel-6.5.0-linux-arm64" -o /usr/local/bin/bazel;;
                 *)
                   echo \"Warning: Unknown architecture '$ARCH'\"
                   exit 1
                   ;;
               esac
-              chmod +x /usr/local/bin/bazel
+
+              # Add permissions
+              chmod 777 /usr/local/bin/bazel
+              echo \"Bazel version is $(bazel --version)\"
 
               # ========== 3) Set up Bazel Cache Permissions ==========
               #mkdir -p /root/.cache/bazel
