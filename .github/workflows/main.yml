@@ -122,7 +122,7 @@ jobs:
 
               # ========== 2) Install Stable Bazel Version ==========
               curl -sSL https://github.com/bazelbuild/bazelisk/releases/download/v1.25.0/bazelisk-linux-amd64 -o /usr/local/bin/bazel
-              export USE_BAZEL_VERSION="8.1.0"
+              export USE_BAZEL_VERSION="7.5.0"
 
               # Add permissions
               chmod 777 /usr/local/bin/bazel
@@ -148,19 +148,14 @@ jobs:
               export CC=clang
               export TF_PYTHON_VERSION=\${PYTHON_VERSION}
               export PYTHON=/opt/tflite_env/bin/python
-              export BAZELISK_CACHE=/tmp/bazelisk_cache
-              mkdir -p /tmp/bazelisk_cache
+              #export BAZELISK_CACHE=/tmp/bazelisk_cache
+              #mkdir -p /tmp/bazelisk_cache
 
               if [[ \"\${ARCH_VERSION}\" == \"aarch64\" ]]; then
                 export TENSORFLOW_TARGET=\"aarch64\"
               fi
 
-              ./tensorflow/lite/tools/pip_package/build_pip_package_with_bazel.sh --define=tflite_enable_xnnpack=true \
-                --define=xnnpack_enable_subgraph_reshaping=true \
-                --define=no_tensorflow_py_deps=true \
-                \$ARCH_FLAG \
-                \$GLOBAL_FLAGS \
-                --verbose_failures
+              ./tensorflow/lite/tools/pip_package/build_pip_package_with_bazel.sh \$ARCH_FLAG \$GLOBAL_FLAGS --define=tflite_enable_xnnpack=true --define=xnnpack_enable_subgraph_reshaping=true --define=no_tensorflow_py_deps=true --verbose_failures
 
               # ========== 7) Locate and Rename the Built Wheel ==========
               mkdir -p /work/wheels
