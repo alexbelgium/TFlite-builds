@@ -150,7 +150,7 @@ jobs:
               export BAZELISK_CACHE=/tmp/bazelisk_cache
               mkdir -p /tmp/bazelisk_cache
 
-              if [ "$(ARCH_VERSION) == "aarch64" ] ; then TENSORFLOW_TARGET=aarch64; fi
+              [[ \"$(ARCH_VERSION)\" == \"aarch64\" ]] && export TENSORFLOW_TARGET=aarch64
 
               ./tensorflow/lite/tools/pip_package/build_pip_package_with_bazel.sh \
                 --define=tflite_enable_xnnpack=true \
