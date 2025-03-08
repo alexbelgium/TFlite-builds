@@ -61,7 +61,7 @@ jobs:
             echo "deb [arch=arm64] http://ports.ubuntu.com/ jammy-updates main universe multiverse restricted" | sudo tee -a /etc/apt/sources.list
             echo "deb [arch=arm64] http://ports.ubuntu.com/ jammy-security main universe multiverse restricted" | sudo tee -a /etc/apt/sources.list
             sudo apt-get update
-            sudo apt-get install --no-install-recommends -y crossbuild-essential-arm64 python$PYTHON_VERSION-dev:arm64 python$PYTHON_VERSION-venv:arm64
+            sudo apt-get install --no-install-recommends -y crossbuild-essential-arm64 python$PYTHON_VERSION-dev:arm64
           fi
 
           # ========== 2) Install Bazel (x86_64 binary is fine; we just pass cross-compilation flags) ==========
