@@ -121,7 +121,12 @@ jobs:
               apt-get install --no-install-recommends -y build-essential clang gcc g++ gcc-aarch64-linux-gnu git zip unzip pkg-config curl # python3-pygments python3-pkg-resources
 
               # ========== 2) Install Stable Bazel Version ==========
-              curl -sSL https://github.com/bazelbuild/bazelisk/releases/download/v1.25.0/bazelisk-linux-amd64 -o /usr/local/bin/bazel
+              if [[ \"\${ARCH_VERSION}\" == \"aarch64\" ]]; then
+                BAZEL_ARCH=arm64
+              else
+                BAZEL_ARCH=amd64
+              fi
+              curl -sSL https://github.com/bazelbuild/bazelisk/releases/download/v1.25.0/bazelisk-linux-\$BAZEL_ARCH -o /usr/local/bin/bazel
               #export USE_BAZEL_VERSION="7.5.0"
 
               # Add permissions
