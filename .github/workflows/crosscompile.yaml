@@ -55,15 +55,6 @@ jobs:
             python$PYTHON_VERSION build-essential clang git zip unzip pkg-config curl \
             python$PYTHON_VERSION-dev python$PYTHON_VERSION-venv
 
-          # Install cross-compiler if target is aarch64
-          if [[ "$ARCH" == "aarch64" ]]; then
-            echo "deb [arch=arm64] http://ports.ubuntu.com/ jammy main universe multiverse restricted" | sudo tee -a /etc/apt/sources.list
-            echo "deb [arch=arm64] http://ports.ubuntu.com/ jammy-updates main universe multiverse restricted" | sudo tee -a /etc/apt/sources.list
-            echo "deb [arch=arm64] http://ports.ubuntu.com/ jammy-security main universe multiverse restricted" | sudo tee -a /etc/apt/sources.list
-            sudo apt-get update
-            sudo apt-get install -y crossbuild-essential-arm64
-          fi
-
           # ========== 2) Install Bazel (x86_64 binary is fine; we just pass cross-compilation flags) ==========
           sudo curl -sSL https://github.com/bazelbuild/bazelisk/releases/download/v1.25.0/bazelisk-linux-amd64 -o /usr/local/bin/bazel
           sudo chmod 777 /usr/local/bin/bazel
@@ -100,7 +91,6 @@ jobs:
               # Enforce cross-compilation settings
               ARCH_FLAGS="--config=elinux_aarch64 --cpu=aarch64"
               export TENSORFLOW_TARGET="aarch64"
-              export CC=clang          
               ;;
             *)
               echo "Unknown ARCH '$ARCH'"
