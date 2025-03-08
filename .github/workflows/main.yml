@@ -122,6 +122,7 @@ jobs:
 
               # ========== 2) Install Stable Bazel Version ==========
               curl -sSL https://github.com/bazelbuild/bazelisk/releases/download/v1.25.0/bazelisk-linux-amd64 -o /usr/local/bin/bazel
+              export USE_BAZEL_VERSION="8.1.0"
 
               # Add permissions
               chmod 777 /usr/local/bin/bazel
