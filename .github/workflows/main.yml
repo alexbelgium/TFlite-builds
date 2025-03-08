@@ -168,10 +168,15 @@ jobs:
       - name: Verify Wheel Architectures
         run: file wheels/*.whl
 
+      - name: Prepare Python Version
+        id: prepare_python_version
+        run: echo "python_version=${{ matrix.python }}" | sed 's/\.//g' >> $GITHUB_ENV
+      
       - name: Upload Wheel Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: tflite_runtime-${{ env.TFLITE_VERSION }}-cp${{ matrix.python.replace('.', '') }}-cp${{ matrix.python.replace('.', '') }}-linux_${{ matrix.arch }}
+          name: tflite_runtime-${{ env.TFLITE_VERSION }}-cp${{ env.python_version }}-cp${{ env.python_version }}-linux_${{ matrix.arch }}
+          path: wheels/*.whl
 
   release:
     runs-on: ubuntu-latest
