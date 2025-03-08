@@ -113,7 +113,8 @@ jobs:
             --define=tflite_enable_xnnpack=true \
             --define=xnnpack_enable_subgraph_reshaping=true \
             --define=no_tensorflow_py_deps=true \
-            --config=elinux_aarch64" \
+            --config=elinux_aarch64 \
+            $ARCH_FLAGS \
             $GLOBAL_FLAGS \
             $EXTRA_BAZEL_FLAGS
 
