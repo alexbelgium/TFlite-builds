@@ -1,4 +1,4 @@
-name: publish-tflite-runtime-wheels
+name: publish-test
 
 on:
   push:
