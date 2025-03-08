@@ -24,48 +24,48 @@ jobs:
       - name: Build TFLite Runtime
         run: |
           set -eux
-      
+
           ARCH="${{ matrix.arch }}"
           PYTHON_VERSION="${{ matrix.python }}"
           echo "Building TFLite Runtime for $ARCH / Python $PYTHON_VERSION"
-      
+
           # ========== 1) Install System Dependencies ==========
           sudo add-apt-repository ppa:deadsnakes/ppa
           sudo apt-get update
           sudo apt-get install --no-install-recommends -y \
             python$PYTHON_VERSION build-essential clang git zip unzip pkg-config curl \
             python$PYTHON_VERSION-dev python$PYTHON_VERSION-venv
-      
+
+          # Install cross-compiler if target is aarch64
           if [[ "$ARCH" == "aarch64" ]]; then
             sudo apt-get install --no-install-recommends -y crossbuild-essential-arm64
           fi
-      
-          # ========== 2) Install Bazel ==========
+
+          # ========== 2) Install Bazel (x86_64 binary is fine; we just pass cross-compilation flags) ==========
           sudo curl -sSL https://github.com/bazelbuild/bazelisk/releases/download/v1.25.0/bazelisk-linux-amd64 -o /usr/local/bin/bazel
           sudo chmod 777 /usr/local/bin/bazel
           echo "Bazel version is $(bazel --version)"
-      
+
           # ========== 3) Create and Activate Python Virtual Env ==========
           python${PYTHON_VERSION} -m venv /tmp/tflite_env
           source /tmp/tflite_env/bin/activate
           pip install --upgrade pip wheel numpy auditwheel setuptools
-      
+
           # ========== 4) Clone TensorFlow ==========
           git clone https://github.com/tensorflow/tensorflow.git
           cd tensorflow
           git checkout tags/v${TFLITE_VERSION}
 
-          # DEBUG START
+          # ========== Debug Info ==========
           echo "===== Bazel Configuration ====="
           cat .bazelrc || echo "No .bazelrc found"
           echo "===== Searching for -msse4.2 in TensorFlow Build Files ====="
           grep -r --include=*.bzl --include=*.BUILD --include=.bazelrc "\-msse4.2" . || echo "No -msse4.2 found"
-          # DEBUG END
-      
+
           # ========== 5) Architecture-specific Flags ==========
           GLOBAL_FLAGS="--strip=always"
           EXTRA_BAZEL_FLAGS=""
-      
+
           case "$ARCH" in
             x86_64)
               ARCH_FLAGS="--cpu=k8"
@@ -78,19 +78,24 @@ jobs:
               export CXX=clang++
               ;;
             aarch64)
-              ARCH_FLAGS="--config=elinux_aarch64 --copt=-O3 --copt=-mno-sse4.2 --copt=-mno-sse4.1 --copt=-mno-avx"
+              # Enforce cross-compilation settings
+              ARCH_FLAGS="--config=elinux_aarch64 --cpu=aarch64 --copt=-O3 --copt=-mno-sse4.2 --copt=-mno-sse4.1 --copt=-mno-avx"
               export CC=aarch64-linux-gnu-gcc
               export CXX=aarch64-linux-gnu-g++
               export LD_LIBRARY_PATH=/usr/aarch64-linux-gnu/lib
-              EXTRA_BAZEL_FLAGS="--action_env=CC=aarch64-linux-gnu-gcc --action_env=CXX=aarch64-linux-gnu-g++"
-      
+              EXTRA_BAZEL_FLAGS="--action_env=CC=aarch64-linux-gnu-gcc \
+                                 --action_env=CXX=aarch64-linux-gnu-g++ \
+                                 --action_env=LD_LIBRARY_PATH=/usr/aarch64-linux-gnu/lib"
+
+              # Remove SSE/AVX references if present
               if [ -f tensorflow/lite/build_def.bzl ]; then
                 echo "tensorflow/lite/build_def.bzl exists"
-                sed -i "/msse/d" tensorflow/lite/build_def.bzl
+                sed -i '/msse/d' tensorflow/lite/build_def.bzl
+                sed -i '/mavx/d' tensorflow/lite/build_def.bzl
               else
                 echo "no tensorflow/lite/build_def.bzl exists"
               fi
-      
+
               if [ -f ".bazelrc" ]; then
                 sed -i '/msse/d' .bazelrc
                 sed -i '/mavx/d' .bazelrc
@@ -103,10 +108,10 @@ jobs:
               exit 1
               ;;
           esac
-      
+
           echo "ARCH_FLAGS: $ARCH_FLAGS"
           echo "EXTRA_BAZEL_FLAGS: $EXTRA_BAZEL_FLAGS"
-      
+
           # ========== 6) Build the TFLite Runtime ==========
           export TF_PYTHON_VERSION="$PYTHON_VERSION"
           export PYTHON=$(which python)
@@ -119,7 +124,7 @@ jobs:
             $EXTRA_BAZEL_FLAGS \
             --verbose_failures \
             --announce_rc
-      
+
           # ========== 7) Locate and Rename the Wheel ==========
           mkdir -p /home/runner/work/wheels
           WHEEL_PATH=$(find tensorflow/lite/tools/pip_package/gen/tflite_pip/python3/dist -name "*.whl" | head -n 1)
