@@ -21,136 +21,169 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
+      - name: Prepare Environment
+        run: |
+          set -eux
+
+          # 1) Install system dependencies
+          sudo add-apt-repository ppa:deadsnakes/ppa
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y \
+            python${{ matrix.python }} build-essential clang git zip unzip pkg-config curl \
+            python${{ matrix.python }}-dev python${{ matrix.python }}-venv
+
+          # 2) Optionally install cross-compiler if target is aarch64
+          if [[ "${{ matrix.arch }}" == "aarch64" ]]; then
+            sudo apt-get install --no-install-recommends -y crossbuild-essential-arm64
+          fi
+
+          # 3) Install Bazel via bazelisk
+          sudo curl -sSL https://github.com/bazelbuild/bazelisk/releases/download/v1.25.0/bazelisk-linux-amd64 -o /usr/local/bin/bazel
+          sudo chmod 777 /usr/local/bin/bazel
+          echo "Bazel version: $(bazel --version)"
+
+      - name: Create Python venv
+        run: |
+          python${{ matrix.python }} -m venv /tmp/tflite_env
+          source /tmp/tflite_env/bin/activate
+          pip install --upgrade pip wheel numpy auditwheel setuptools
+
+      - name: Clone TensorFlow
+        run: |
+          git clone https://github.com/tensorflow/tensorflow.git
+          cd tensorflow
+          git checkout tags/v${{ env.TFLITE_VERSION }}
+
+      - name: Bazel Fetch External Repos
+        # We run `bazel fetch` so that external/ruy, etc., is materialized on disk
+        # This allows us to do a "sed -i" or grep pass on it if necessary.
+        run: |
+          set -eux
+          cd tensorflow
+          # We only "fetch" the TFLite pip package & its deps.
+          bazel fetch //tensorflow/lite/tools/pip_package:build_pip_package
+          echo "Bazel fetch complete."
+
+      - name: Remove SSE/AVX Flags
+        run: |
+          set -eux
+          cd tensorflow
+
+          echo "===== Searching for SSE/AVX flags BEFORE removal ====="
+          # Look for -mavx, -mavx2, -msse4.1, -msse4.2
+          grep -r -E --include=\*.bzl --include=\*.BUILD --include=\*.cc --include=\*.h --include=.bazelrc '(-mavx|-mavx2|-msse4\.1|-msse4\.2)' . || true
+
+          echo "===== Removing SSE/AVX references in local TF files ====="
+          # 1) TFLite local build_def.bzl
+          if [[ -f tensorflow/lite/build_def.bzl ]]; then
+            sed -i '/mavx/d' tensorflow/lite/build_def.bzl || true
+            sed -i '/msse4\./d' tensorflow/lite/build_def.bzl || true
+          fi
+
+          # 2) .bazelrc
+          if [[ -f .bazelrc ]]; then
+            sed -i '/mavx/d' .bazelrc || true
+            sed -i '/msse4\./d' .bazelrc || true
+          fi
+
+          echo "===== Removing SSE/AVX references in EXTERNAL repos ====="
+          # Because ruy is in ./bazel-*/external/ruy,
+          # we do a broader find + sed:
+          find . -path '*/external/*' \
+            \( -name '*.bzl' -o -name '*.BUILD' -o -name '*.bazelrc' -o -name '*.cc' -o -name '*.h' \) \
+            -exec sed -i '/-mavx/d' {} \; -exec sed -i '/-mavx2/d' {} \; -exec sed -i '/-msse4\.1/d' {} \; -exec sed -i '/-msse4\.2/d' {} \; || true
+
+          echo "===== Searching for SSE/AVX flags AFTER removal ====="
+          grep -r -E --include=\*.bzl --include=\*.BUILD --include=\*.cc --include=\*.h --include=.bazelrc '(-mavx|-mavx2|-msse4\.1|-msse4\.2)' . || true
+
+      - name: Prepare Namings
+        id: prepare_names
+        run: |
+          echo "python_version=${{ matrix.python }}" | sed 's/\.//g' >> $GITHUB_ENV
+          case "${{ matrix.arch }}" in
+            x86_64|aarch64)
+              echo "tflite_version=${TFLITE_VERSION}" >> $GITHUB_ENV
+              echo "arch_version=${{ matrix.arch }}" >> $GITHUB_ENV
+            ;;
+            x86_64_noavx)
+              echo "tflite_version=${TFLITE_VERSION}_noavx" >> $GITHUB_ENV
+              echo "arch_version=x86_64" >> $GITHUB_ENV
+            ;;
+            *)
+              echo "Warning: Unknown architecture $ARCH"
+              exit 1
+            ;;
+          esac
+
       - name: Build TFLite Runtime
         run: |
           set -eux
+          cd tensorflow
+          source /tmp/tflite_env/bin/activate
 
           ARCH="${{ matrix.arch }}"
           PYTHON_VERSION="${{ matrix.python }}"
           echo "Building TFLite Runtime for $ARCH / Python $PYTHON_VERSION"
 
-          # ========== 1) Install System Dependencies ==========
-          sudo add-apt-repository ppa:deadsnakes/ppa
-          sudo apt-get update
-          sudo apt-get install --no-install-recommends -y \
-            python$PYTHON_VERSION build-essential clang git zip unzip pkg-config curl \
-            python$PYTHON_VERSION-dev python$PYTHON_VERSION-venv
-
-          # Install cross-compiler if target is aarch64
+          # Setup cross-compiler for aarch64:
           if [[ "$ARCH" == "aarch64" ]]; then
-            sudo apt-get install --no-install-recommends -y crossbuild-essential-arm64
+            export CC=aarch64-linux-gnu-gcc
+            export CXX=aarch64-linux-gnu-g++
+            export LD_LIBRARY_PATH=/usr/aarch64-linux-gnu/lib
           fi
 
-          # ========== 2) Install Bazel (x86_64 binary is fine; we just pass cross-compilation flags) ==========
-          sudo curl -sSL https://github.com/bazelbuild/bazelisk/releases/download/v1.25.0/bazelisk-linux-amd64 -o /usr/local/bin/bazel
-          sudo chmod 777 /usr/local/bin/bazel
-          echo "Bazel version is $(bazel --version)"
+          # Build TFLite Python wrapper with minimal SSE/AVX references
+          bazel build -c opt \
+            --config=elinux_aarch64 --cpu=aarch64 \
+            --strip=always \
+            --verbose_failures \
+            --announce_rc \
+            //tensorflow/lite/python/interpreter_wrapper:_pywrap_tensorflow_interpreter_wrapper
 
-          # ========== 3) Create and Activate Python Virtual Env ==========
-          python${PYTHON_VERSION} -m venv /tmp/tflite_env
-          source /tmp/tflite_env/bin/activate
-          pip install --upgrade pip wheel numpy auditwheel setuptools
-
-          # ========== 4) Clone TensorFlow ==========
-          git clone https://github.com/tensorflow/tensorflow.git
+      - name: Package Wheel
+        run: |
+          set -eux
           cd tensorflow
-          git checkout tags/v${TFLITE_VERSION}
+          source /tmp/tflite_env/bin/activate
 
-          # ========== Debug Info ==========
-          echo "===== Bazel Configuration ====="
-          cat .bazelrc || echo "No .bazelrc found"
-          echo "===== Searching for -msse4.2 in TensorFlow Build Files ====="
-          grep -r --include=*.bzl --include=*.BUILD --include=.bazelrc "\-msse4.2" . || echo "No -msse4.2 found"
-
-          # ========== 5) Architecture-specific Flags ==========
-          GLOBAL_FLAGS="--strip=always"
-          EXTRA_BAZEL_FLAGS=""
-
-          case "$ARCH" in
-            x86_64)
-              ARCH_FLAGS="--cpu=k8"
-              export CC=clang
-              export CXX=clang++
-              ;;
-            x86_64_noavx)
-              ARCH_FLAGS="--cpu=core2 --copt=-mno-avx --copt=-mno-avx2 --copt=-msse4.2 --copt=-msse4.1"
-              export CC=clang
-              export CXX=clang++
-              ;;
-            aarch64)
-              # Enforce cross-compilation settings
-              ARCH_FLAGS="--config=elinux_aarch64 --cpu=aarch64"
-              export CC=aarch64-linux-gnu-gcc
-              export CXX=aarch64-linux-gnu-g++
-              export LD_LIBRARY_PATH=/usr/aarch64-linux-gnu/lib
-              EXTRA_BAZEL_FLAGS="--action_env=CC=aarch64-linux-gnu-gcc \
-                                 --action_env=CXX=aarch64-linux-gnu-g++ \
-                                 --action_env=LD_LIBRARY_PATH=/usr/aarch64-linux-gnu/lib"
-
-              # Remove SSE/AVX references if present
-              if [ -f tensorflow/lite/build_def.bzl ]; then
-                echo "tensorflow/lite/build_def.bzl exists"
-                sed -i '/msse/d' tensorflow/lite/build_def.bzl
-                sed -i '/mavx/d' tensorflow/lite/build_def.bzl
-              else
-                echo "no tensorflow/lite/build_def.bzl exists"
-              fi
-
-              if [ -f ".bazelrc" ]; then
-                sed -i '/msse/d' .bazelrc
-                sed -i '/mavx/d' .bazelrc
-              else
-                echo "no .bazelrc exists"
-              fi
-              ;;
-            *)
-              echo "Unknown ARCH '$ARCH'"
-              exit 1
-              ;;
-          esac
-
-          echo "ARCH_FLAGS: $ARCH_FLAGS"
-          echo "EXTRA_BAZEL_FLAGS: $EXTRA_BAZEL_FLAGS"
-
-          # ========== 6) Build the TFLite Runtime ==========
-          export TF_PYTHON_VERSION="$PYTHON_VERSION"
-          export PYTHON=$(which python)
+          # Actually build the final pip package:
           ./tensorflow/lite/tools/pip_package/build_pip_package_with_bazel.sh \
             --define=tflite_enable_xnnpack=true \
             --define=xnnpack_enable_subgraph_reshaping=true \
             --define=no_tensorflow_py_deps=true \
-            $ARCH_FLAGS \
-            $GLOBAL_FLAGS \
-            $EXTRA_BAZEL_FLAGS \
+            --config=elinux_aarch64 \
+            --cpu=aarch64 \
+            --strip=always \
             --verbose_failures \
             --announce_rc
 
-          # ========== 7) Locate and Rename the Wheel ==========
           mkdir -p /home/runner/work/wheels
           WHEEL_PATH=$(find tensorflow/lite/tools/pip_package/gen/tflite_pip/python3/dist -name "*.whl" | head -n 1)
           if [[ -z "$WHEEL_PATH" ]]; then
             echo "Error: No wheel file found!"
             exit 1
           fi
-          NEW_WHEEL_PATH="/home/runner/work/wheels/tflite_runtime-${TFLITE_VERSION}-${PYTHON_VERSION}-linux_${ARCH}.whl"
+
+          NEW_WHEEL_PATH="/home/runner/work/wheels/tflite_runtime-${{ env.TFLITE_VERSION }}-${{ matrix.python }}-linux_${ARCH}.whl"
           mv "$WHEEL_PATH" "$NEW_WHEEL_PATH"
           echo "Wheel created: $NEW_WHEEL_PATH"
 
       - name: List Built Wheels
         run: ls -l /home/runner/work/wheels
 
-      - name: Verify Wheel Architecture
-        run: file /home/runner/work/wheels/*.whl
+      - name: Verify Wheel Architectures
+        run: file wheels/*.whl
 
       - name: Upload Wheel Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: tflite_runtime-${{ env.TFLITE_VERSION }}-${{ matrix.arch }}-py${{ matrix.python }}
-          path: /home/runner/work/wheels/*.whl
+          name: tflite_runtime-${{ env.tflite_version }}-cp${{ env.python_version }}-cp${{ env.python_version }}-linux_${{ env.arch_version }}
+          path: wheels/*.whl
 
   release:
     runs-on: ubuntu-latest
     needs: build-tflite-runtime
+    name: Create and Upload Release
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
