@@ -84,7 +84,7 @@ jobs:
             -w /work \
             -e ARCH="$ARCH" \
             -e PYTHON_VERSION="$PYTHON_VERSION" \
-            -e TFLITE_VERSION="TFLITE_VERSION" \
+            -e TFLITE_VERSION="$TFLITE_VERSION" \
             -e ARCH_FLAG="$ARCH_FLAG" \
             -e GLOBAL_FLAGS="$GLOBAL_FLAGS" \
             --memory=8g --cpus=4 \
