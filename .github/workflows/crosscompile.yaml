@@ -37,14 +37,6 @@ jobs:
           df -h
           docker system prune -af
 
-      # Removed QEMU setup step since we are now cross compiling aarch64
-      # - name: Set up QEMU for ARM Emulation
-      #   if: matrix.arch == 'aarch64'
-      #   run: |
-      #     sudo apt-get update
-      #     sudo apt-get install -y qemu-user-static binfmt-support
-      #     docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
-
       - name: Run Build in Container
         run: |
           set -eux
@@ -161,7 +153,7 @@ jobs:
       - name: Upload Wheel Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: tflite_runtime-${{ env.TFLITE_VERSION }}-${{ matrix.arch }}-py${{ matrix.python }}
+          name: tflite_runtime-\${{ env.TFLITE_VERSION }}-\${{ matrix.arch }}-py\${{ matrix.python }}
           path: wheels/*.whl
 
   release:
@@ -183,20 +175,20 @@ jobs:
       - name: Authenticate GitHub CLI
         run: gh auth status
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: \${{ secrets.GITHUB_TOKEN }}
 
       - name: Create GitHub Release (if not exists)
         run: |
-          gh release view ${{ env.TFLITE_VERSION }} -R "${{ github.repository }}" > /dev/null 2>&1 || \
-          gh release create ${{ env.TFLITE_VERSION }} \
-            -R "${{ github.repository }}" \
-            --title "tflite_runtime ${{ env.TFLITE_VERSION }}" \
-            --notes "Automated build for tflite_runtime ${{ env.TFLITE_VERSION }}"
+          gh release view \${{ env.TFLITE_VERSION }} -R "\${{ github.repository }}" > /dev/null 2>&1 || \
+          gh release create \${{ env.TFLITE_VERSION }} \
+            -R "\${{ github.repository }}" \
+            --title "tflite_runtime \${{ env.TFLITE_VERSION }}" \
+            --notes "Automated build for tflite_runtime \${{ env.TFLITE_VERSION }}"
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: \${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload Wheels to GitHub Release
         run: |
-          gh release upload ${{ env.TFLITE_VERSION }} wheels/**/*.whl --clobber -R "${{ github.repository }}"
+          gh release upload \${{ env.TFLITE_VERSION }} wheels/**/*.whl --clobber -R "\${{ github.repository }}"
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: \${{ secrets.GITHUB_TOKEN }}
