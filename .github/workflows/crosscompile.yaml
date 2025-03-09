@@ -59,7 +59,7 @@ jobs:
 
           # ========== 2) Install Bazel (x86_64 binary is fine; we just pass cross-compilation flags) ==========
           sudo curl -sSL https://github.com/bazelbuild/bazelisk/releases/download/v1.24.1/bazelisk-linux-amd64 -o /usr/local/bin/bazel
-          sudo chmod 777 /usr/local/bin/bazel
+          sudo chmod +x /usr/local/bin/bazel
           echo "Bazel version is $(bazel --version)"
 
           # ========== 3) Create and Activate Python Virtual Env ==========
