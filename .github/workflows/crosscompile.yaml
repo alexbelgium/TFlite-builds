@@ -27,11 +27,11 @@ jobs:
           echo "python_version=${{ matrix.python }}" | sed 's/\.//g' >> $GITHUB_ENV
           case "${{ matrix.arch }}" in
             x86_64|aarch64)
-              echo "tflite_version=${TFLITE_VERSION//-/_}" >> $GITHUB_ENV
+              echo "tflite_version=${TFLITE_VERSION}" >> $GITHUB_ENV
               echo "arch_version=${{ matrix.arch }}" >> $GITHUB_ENV
             ;;
             x86_64_noavx)
-              echo "tflite_version=${TFLITE_VERSION//-/_}_noavx" >> $GITHUB_ENV
+              echo "tflite_version=${TFLITE_VERSION}_noavx" >> $GITHUB_ENV
               echo "arch_version=x86_64" >> $GITHUB_ENV
             ;;
             *)
@@ -145,7 +145,21 @@ jobs:
           # ========== 7) Build the TFLite Runtime ==========
           export TF_PYTHON_VERSION="$PYTHON_VERSION"
           export PYTHON=$(which python)
-          CUSTOM_BAZEL_FLAGS="$NOAVX --define=tflite_enable_xnnpack=true --define=xnnpack_enable_subgraph_reshaping=true --define=no_tensorflow_py_deps=true --define=tflite_with_flex=true --strip=always --config=monolithic --copt=-DNDEBUG --copt=-O3 --copt=-flto --linkopt=-flto --copt=-fdata-sections --linkopt=-Wl,--gc-sections --verbose_failures --announce_rc"
+          CUSTOM_BAZEL_FLAGS="$NOAVX |
+            --define=tflite_enable_xnnpack=true \
+            --define=xnnpack_enable_subgraph_reshaping=true \
+            --define=no_tensorflow_py_deps=true \
+            --define=tflite_with_flex=true \
+            --strip=always \
+            --config=monolithic \
+            --copt=-DNDEBUG \
+            --copt=-O3 \
+            --copt=-flto \
+            --linkopt=-flto \
+            --copt=-fdata-sections \
+            --linkopt=-Wl,--gc-sections \
+            --verbose_failures \
+            --announce_rc"
           ./tensorflow/lite/tools/pip_package/build_pip_package_with_bazel.sh $ARCH_FLAGS
           
           # ========== 8) Locate and Rename the Wheel ==========
@@ -155,7 +169,8 @@ jobs:
              echo "Error: No wheel file found!"
              exit 1
            fi
-           NEW_WHEEL_PATH="/home/runner/work/wheels/tflite_runtime-${{ env.TFLITE_VERSION }}-${{ matrix.python }}-linux_${ARCH}.whl"
+           TFLITE_VERSION="${{ env.TFLITE_VERSION }}"
+           NEW_WHEEL_PATH="/home/runner/work/wheels/tflite_runtime-${TFLITE_VERSION//-/_}-${{ matrix.python }}-linux_${ARCH}.whl"
            mv "$WHEEL_PATH" "$NEW_WHEEL_PATH"
            echo "Wheel created: $NEW_WHEEL_PATH"
 
