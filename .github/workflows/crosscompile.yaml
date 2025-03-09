@@ -98,7 +98,7 @@ jobs:
           # Use Clang (and Clang++), remove direct gcc/g++ unless needed for cross-compile
           sudo apt-get install -y \
             python$PYTHON_VERSION build-essential lld git zip unzip pkg-config curl \
-            python$PYTHON_VERSION-dev python$PYTHON_VERSION-venv
+            python$PYTHON_VERSION-dev python$PYTHON_VERSION-venv debootstrap
 
           # Build for glibc 2.35
           sudo debootstrap --arch=amd64 jammy /opt/ubuntu22-sysroot http://archive.ubuntu.com/ubuntu/
@@ -165,6 +165,8 @@ jobs:
             --copt=--sysroot=/opt/ubuntu22-sysroot \
             --linkopt=-Wl,--rpath=/opt/ubuntu22-sysroot/lib \
             --linkopt=-Wl,--dynamic-linker=/opt/ubuntu22-sysroot/lib/ld-linux-x86-64.so.2 \
+            --copt=-fdata-sections \
+             --linkopt=-Wl,--gc-sections \
             --copt=-DGLIBCXX_USE_CXX11_ABI=0 \
             --verbose_failures \
             --announce_rc"
