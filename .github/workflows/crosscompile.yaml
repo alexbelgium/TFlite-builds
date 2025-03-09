@@ -169,7 +169,7 @@ jobs:
              echo "Error: No wheel file found!"
              exit 1
            fi
-           NEW_WHEEL_PATH="/home/runner/work/wheels/tflite_runtime-${{ env.TFLITE_VERSION }}-${{ matrix.python }}-linux_${ARCH}.whl"
+           NEW_WHEEL_PATH="/home/runner/work/wheels/tflite_runtime-${{ env.tflite_version }}-cp${{ env.python_version }}-cp${{ env.python_version }}-linux_${{ env.arch_version }}.whl"
            mv "$WHEEL_PATH" "$NEW_WHEEL_PATH"
            echo "Wheel created: $NEW_WHEEL_PATH"
 
