@@ -74,20 +74,10 @@ jobs:
           git checkout tags/v${TFLITE_VERSION}
 
           # ========== 5) Architecture-specific Flags ==========
-          GLOBAL_FLAGS="--strip=always"
-          EXTRA_BAZEL_FLAGS=""
-
           case "$ARCH" in
-            x86_64)
-              ARCH_FLAGS="--cpu=k8"
-              ;;
-            x86_64_noavx)
-              ARCH_FLAGS="--cpu=core2 --copt=-mno-avx --copt=-mno-avx2 --copt=-msse4.2 --copt=-msse4.1"
-              ;;
-            aarch64)
-              # Enforce cross-compilation settings
-              ARCH_FLAGS="--config=elinux_aarch64"
-              ;;
+            x86_64) ARCH_FLAGS="--cpu=k8";;
+            x86_64_noavx) ARCH_FLAGS="--cpu=core2 --copt=-mno-avx --copt=-mno-avx2 --copt=-msse4.2 --copt=-msse4.1";;
+            aarch64) ARCH_FLAGS="--config=elinux_aarch64";;
             *)
               echo "Unknown ARCH '$ARCH'"
               exit 1
@@ -95,13 +85,10 @@ jobs:
           esac
 
           echo "ARCH_FLAGS: $ARCH_FLAGS"
-          echo "EXTRA_BAZEL_FLAGS: $EXTRA_BAZEL_FLAGS"
 
           # ========== 6) Use Clang as compiler ==========
           export CC=clang
           export CXX=clang++
-          # Optionally add:
-          # EXTRA_BAZEL_FLAGS+=" --compiler=clang"
 
           # ========== 7) Build the TFLite Runtime ==========
           export TF_PYTHON_VERSION="$PYTHON_VERSION"
@@ -111,8 +98,12 @@ jobs:
             --define=tflite_enable_xnnpack=true \
             --define=xnnpack_enable_subgraph_reshaping=true \
             --define=no_tensorflow_py_deps=true \
-            $GLOBAL_FLAGS \
-            $EXTRA_BAZEL_FLAGS \
+            --define=tflite_with_flex=true \
+            --strip=always \
+            --config=monolithic \
+            --copt=-DNDEBUG \
+            --copt=-O3 --copt=-flto --linkopt=-flto \
+            --copt=-fdata-sections --linkopt=-Wl,--gc-sections \
             --verbose_failures --announce_rc
 
           # ========== 8) Locate and Rename the Wheel ==========
