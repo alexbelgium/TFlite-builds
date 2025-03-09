@@ -77,7 +77,9 @@ jobs:
             x86_64*) ARCH_FLAGS="native";;
             aarch64)
               ARCH_FLAGS="aarch64"
-              sudo apt-get install -y gcc-aarch64-linux-gnu libpython3.11-dev:arm64
+              sudo dpkg --add-architecture arm64
+              sudo apt-get update
+              sudo apt-get install --no-install-recommends -y gcc-aarch64-linux-gnu libpython3.11-dev:arm64
               # DEBUG TEXT
               find /usr/include -name "pyconfig.h"
               clang --target=aarch64-linux-gnu --version
