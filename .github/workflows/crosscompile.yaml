@@ -54,8 +54,7 @@ jobs:
           # Use Clang (and Clang++), remove direct gcc/g++ unless needed for cross-compile
           sudo apt-get install -y \
             python$PYTHON_VERSION build-essential lld git zip unzip pkg-config curl \
-            python$PYTHON_VERSION-dev python$PYTHON_VERSION-venv \
-            gcc-aarch64-linux-gnu # Keep cross-compiler if you need it for aarch64 linking
+            python$PYTHON_VERSION-dev python$PYTHON_VERSION-venv
 
           # ========== 2) Install Bazel (x86_64 binary is fine; we just pass cross-compilation flags) ==========
           sudo curl -sSL https://github.com/bazelbuild/bazelisk/releases/download/v1.24.1/bazelisk-linux-amd64 -o /usr/local/bin/bazel
@@ -76,7 +75,13 @@ jobs:
           ARCH_FLAGS=""
           case "$ARCH" in
             x86_64*) ARCH_FLAGS="native";;
-            aarch64) ARCH_FLAGS="aarch64";;
+            aarch64)
+              ARCH_FLAGS="aarch64"
+              apt-get install -y gcc-aarch64-linux-gnu libpython3.11-dev:arm64
+              # DEBUG TEXT
+              find /usr/include -name "pyconfig.h"
+              clang --target=aarch64-linux-gnu --version
+            ;;
             *)
               echo "Unknown ARCH '$ARCH'"
               exit 1
