@@ -92,7 +92,7 @@ jobs:
           # ========== 7) Build the TFLite Runtime ==========
           export TF_PYTHON_VERSION="$PYTHON_VERSION"
           export PYTHON=$(which python)
-          bazel build $ARCH_FLAGS --define=tflite_enable_xnnpack=true --define=xnnpack_enable_subgraph_reshaping=true --define=no_tensorflow_py_deps=true --define=tflite_with_flex=true --strip=always --config=monolithic --copt=-DNDEBUG --copt=-O3 --copt=-flto --linkopt=-flto --copt=-fdata-sections --linkopt=-Wl,--gc-sections --verbose_failures --announce_rc //tensorflow/lite/tools/pip_package:build_pip_package
+          bazel build $ARCH_FLAGS --define=tflite_enable_xnnpack=true --define=xnnpack_enable_subgraph_reshaping=true --define=no_tensorflow_py_deps=true --define=tflite_with_flex=true --strip=always --config=monolithic --copt=-DNDEBUG --copt=-O3 --copt=-flto --linkopt=-flto --copt=-fdata-sections --linkopt=-Wl,--gc-sections --verbose_failures --announce_rc
 
           # ========== 8) Locate and Rename the Wheel ==========
           mkdir -p /home/runner/work/wheels
