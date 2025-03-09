@@ -35,7 +35,7 @@ jobs:
               echo "arch_version=x86_64" >> $GITHUB_ENV
             ;;
             *)
-              echo "Warning: Unknown architecture $ARCH"
+              echo "Warning: Unknown architecture ${{ matrix.arch }}"
               exit 1
             ;;
           esac
@@ -77,7 +77,7 @@ jobs:
           case "$ARCH" in
             x86_64) ARCH_FLAGS="--cpu=k8";;
             x86_64_noavx) ARCH_FLAGS="--cpu=core2 --copt=-mno-avx --copt=-mno-avx2 --copt=-msse4.2 --copt=-msse4.1";;
-            aarch64) ARCH_FLAGS="--config=elinux_aarch64";;
+            aarch64) ARCH_FLAGS="--config=elinux_aarch64 --compiler=gcc-aarch64-linux-gnu";;
             *)
               echo "Unknown ARCH '$ARCH'"
               exit 1
@@ -93,7 +93,7 @@ jobs:
           # ========== 7) Build the TFLite Runtime ==========
           export TF_PYTHON_VERSION="$PYTHON_VERSION"
           export PYTHON=$(which python)
-          ./tensorflow/lite/tools/pip_package/build_pip_package_with_bazel.sh $ARCH_FLAGS --define=tflite_enable_xnnpack=true --define=xnnpack_enable_subgraph_reshaping=true --define=no_tensorflow_py_deps=true --define=tflite_with_flex=true --strip=always --config=monolithic --copt=-DNDEBUG --copt=-O3 --copt=-flto --linkopt=-flto --copt=-fdata-sections --linkopt=-Wl,--gc-sections --verbose_failures --announce_rc
+          bazel build $ARCH_FLAGS --define=tflite_enable_xnnpack=true --define=xnnpack_enable_subgraph_reshaping=true --define=no_tensorflow_py_deps=true --define=tflite_with_flex=true --strip=always --config=monolithic --copt=-DNDEBUG --copt=-O3 --copt=-flto --linkopt=-flto --copt=-fdata-sections --linkopt=-Wl,--gc-sections --verbose_failures --announce_rc //tensorflow/lite/tools/pip_package:build_pip_package
 
           # ========== 8) Locate and Rename the Wheel ==========
           mkdir -p /home/runner/work/wheels
