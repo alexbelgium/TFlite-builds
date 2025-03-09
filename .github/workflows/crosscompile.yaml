@@ -58,9 +58,8 @@ jobs:
             gcc-aarch64-linux-gnu # Keep cross-compiler if you need it for aarch64 linking
 
           # ========== 2) Install Bazel (x86_64 binary is fine; we just pass cross-compilation flags) ==========
-          apt-get install -y bazelisk || \
           sudo curl -sSL https://github.com/bazelbuild/bazelisk/releases/download/v1.24.1/bazelisk-linux-amd64 -o /usr/local/bin/bazel
-          sudo chmod 777 /usr/local/bin/bazel || true
+          sudo chmod 777 /usr/local/bin/bazel
           echo "Bazel version is $(bazel --version)"
 
           # ========== 3) Create and Activate Python Virtual Env ==========
@@ -77,7 +76,7 @@ jobs:
           case "$ARCH" in
             x86_64) ARCH_FLAGS="--cpu=k8";;
             x86_64_noavx) ARCH_FLAGS="--cpu=core2 --copt=-mno-avx --copt=-mno-avx2 --copt=-msse4.2 --copt=-msse4.1";;
-            aarch64) ARCH_FLAGS="--config=elinux_aarch64 --compiler=gcc-aarch64-linux-gnu";;
+            aarch64) ARCH_FLAGS="--config=elinux_aarch64";;
             *)
               echo "Unknown ARCH '$ARCH'"
               exit 1
@@ -97,11 +96,13 @@ jobs:
 
           # ========== 8) Locate and Rename the Wheel ==========
           mkdir -p /home/runner/work/wheels
-          WHEEL_PATH=$(find tensorflow/lite/tools/pip_package/gen/tflite_pip/python3/dist -name "*.whl" | head -n 1)
+          WHEEL_PATH=$(find -type f -name "*.whl" | grep "tflite_runtime" | head -n 1)
+          
           if [[ -z "$WHEEL_PATH" ]]; then
             echo "Error: No wheel file found!"
             exit 1
           fi
+          
           NEW_WHEEL_PATH="/home/runner/work/wheels/tflite_runtime-${{ env.TFLITE_VERSION }}-${{ matrix.python }}-linux_${ARCH}.whl"
           mv "$WHEEL_PATH" "$NEW_WHEEL_PATH"
           echo "Wheel created: $NEW_WHEEL_PATH"
@@ -141,11 +142,14 @@ jobs:
 
       - name: Create GitHub Release (if not exists)
         run: |
-          gh release view ${{ env.TFLITE_VERSION }} -R "${{ github.repository }}" > /dev/null 2>&1 || \
-          gh release create ${{ env.TFLITE_VERSION }} \
-            -R "${{ github.repository }}" \
-            --title "tflite_runtime ${{ env.TFLITE_VERSION }}" \
-            --notes "Automated build for tflite_runtime ${{ env.TFLITE_VERSION }}"
+          if gh release view ${{ env.TFLITE_VERSION }} -R "${{ github.repository }}" > /dev/null 2>&1; then
+            echo "Release already exists. Skipping creation."
+          else
+            gh release create ${{ env.TFLITE_VERSION }} \
+              -R "${{ github.repository }}" \
+              --title "tflite_runtime ${{ env.TFLITE_VERSION }}" \
+              --notes "Automated build for tflite_runtime ${{ env.TFLITE_VERSION }}"
+          fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
