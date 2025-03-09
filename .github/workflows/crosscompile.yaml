@@ -14,7 +14,7 @@ env:
 
 jobs:
   build-tflite-runtime:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     strategy:
       fail-fast: false
       matrix:
@@ -97,7 +97,7 @@ jobs:
           sudo apt-get update
           # Use Clang (and Clang++), remove direct gcc/g++ unless needed for cross-compile
           sudo apt-get install -y \
-            python$PYTHON_VERSION build-essential lld git zip unzip pkg-config curl \
+            python$PYTHON_VERSION build-essential lld git zip unzip pkg-config curl glibc-2.36 \
             python$PYTHON_VERSION-dev python$PYTHON_VERSION-venv
 
           # ========== 2) Install Bazel (x86_64 binary is fine; we just pass cross-compilation flags) ==========
