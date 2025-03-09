@@ -7,7 +7,7 @@ permissions:
   contents: write  # Ensure GITHUB_TOKEN can create releases
 
 env:
-  TFLITE_VERSION: "2.19.0-rc0"
+  TFLITE_VERSION: "2.18.0"
 
 jobs:
   build-tflite-runtime:
