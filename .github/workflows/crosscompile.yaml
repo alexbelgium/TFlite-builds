@@ -73,17 +73,21 @@ jobs:
           git checkout tags/v${TFLITE_VERSION}
 
           # ========== 5) Architecture-specific Flags ==========
+          ARCH_FLAGS=""
           case "$ARCH" in
-            x86_64) ARCH_FLAGS="--cpu=k8";;
-            x86_64_noavx) ARCH_FLAGS="--cpu=core2 --copt=-mno-avx --copt=-mno-avx2 --copt=-msse4.2 --copt=-msse4.1";;
-            aarch64) ARCH_FLAGS="--config=elinux_aarch64";;
+            x86_64*) ARCH_FLAGS="native";;
+            aarch64) ARCH_FLAGS="aarch64";;
             *)
               echo "Unknown ARCH '$ARCH'"
               exit 1
               ;;
           esac
 
-          echo "ARCH_FLAGS: $ARCH_FLAGS"
+          # ========== 5) Build-specific Flags ==========
+          NOAVX=""
+          if [[ "$ARCH" == "x86_64_noavx" ]]; then
+            NOAVX="--cpu=core2 --copt=-mno-avx --copt=-mno-avx2 --copt=-msse4.2 --copt=-msse4.1"
+          fi
 
           # ========== 6) Use Clang as compiler ==========
           export CC=clang
@@ -92,20 +96,19 @@ jobs:
           # ========== 7) Build the TFLite Runtime ==========
           export TF_PYTHON_VERSION="$PYTHON_VERSION"
           export PYTHON=$(which python)
-          bazel build $ARCH_FLAGS --define=tflite_enable_xnnpack=true --define=xnnpack_enable_subgraph_reshaping=true --define=no_tensorflow_py_deps=true --define=tflite_with_flex=true --strip=always --config=monolithic --copt=-DNDEBUG --copt=-O3 --copt=-flto --linkopt=-flto --copt=-fdata-sections --linkopt=-Wl,--gc-sections --verbose_failures --announce_rc
-
+          CUSTOM_BAZEL_FLAGS="$NOAVX --define=tflite_enable_xnnpack=true --define=xnnpack_enable_subgraph_reshaping=true --define=no_tensorflow_py_deps=true --define=tflite_with_flex=true --strip=always --config=monolithic --copt=-DNDEBUG --copt=-O3 --copt=-flto --linkopt=-flto --copt=-fdata-sections --linkopt=-Wl,--gc-sections --verbose_failures --announce_rc"
+          ./tensorflow/lite/tools/pip_package/build_pip_package_with_bazel.sh $ARCH_FLAGS
+          
           # ========== 8) Locate and Rename the Wheel ==========
-          mkdir -p /home/runner/work/wheels
-          WHEEL_PATH=$(find -type f -name "*.whl" | grep "tflite_runtime" | head -n 1)
-          
-          if [[ -z "$WHEEL_PATH" ]]; then
-            echo "Error: No wheel file found!"
-            exit 1
-          fi
-          
-          NEW_WHEEL_PATH="/home/runner/work/wheels/tflite_runtime-${{ env.TFLITE_VERSION }}-${{ matrix.python }}-linux_${ARCH}.whl"
-          mv "$WHEEL_PATH" "$NEW_WHEEL_PATH"
-          echo "Wheel created: $NEW_WHEEL_PATH"
+           mkdir -p /home/runner/work/wheels
+           WHEEL_PATH=$(find tensorflow/lite/tools/pip_package/gen/tflite_pip/python3/dist -name "*.whl" | head -n 1)
+           if [[ -z "$WHEEL_PATH" ]]; then
+             echo "Error: No wheel file found!"
+             exit 1
+           fi
+           NEW_WHEEL_PATH="/home/runner/work/wheels/tflite_runtime-${{ env.TFLITE_VERSION }}-${{ matrix.python }}-linux_${ARCH}.whl"
+           mv "$WHEEL_PATH" "$NEW_WHEEL_PATH"
+           echo "Wheel created: $NEW_WHEEL_PATH"
 
       - name: List Built Wheels
         run: ls -l /home/runner/work/wheels
