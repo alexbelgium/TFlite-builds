@@ -158,6 +158,7 @@ jobs:
             --linkopt=-flto \
             --copt=-fdata-sections \
             --linkopt=-Wl,--gc-sections \
+            --copt=-DGLIBCXX_USE_CXX11_ABI=0 \
             --verbose_failures \
             --announce_rc"
           ./tensorflow/lite/tools/pip_package/build_pip_package_with_bazel.sh $ARCH_FLAGS
