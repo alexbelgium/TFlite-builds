@@ -40,6 +40,47 @@ jobs:
             ;;
           esac
 
+      - name: Configure arm64 Repositories
+        if: matrix.arch == 'aarch64'
+        run: |
+          [[ "$(lsb_release -si)" == "Ubuntu" ]] || exit 0
+          sudo sed -i "s/deb\ /deb \[arch=amd64\]\ /g" /etc/apt/sources.list
+
+          if [[ "$(lsb_release -sc)" == "noble" ]]; then
+            echo "NOBLE"
+            sudo rm -f /etc/apt/sources.list.d/ubuntu.sources
+            sudo tee /etc/apt/sources.list.d/ubuntu.sources > /dev/null <<EOT
+          Types: deb
+          URIs: http://archive.ubuntu.com/ubuntu/
+          Suites: noble noble-updates noble-backports
+          Components: main universe restricted multiverse
+          Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+          Architectures: amd64
+
+          ## Ubuntu security updates
+          Types: deb
+          URIs: http://security.ubuntu.com/ubuntu/
+          Suites: noble-security
+          Components: main universe restricted multiverse
+          Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+          Architectures: amd64
+
+          Types: deb
+          URIs: http://ports.ubuntu.com/ubuntu-ports
+          Suites: noble noble-updates noble-security
+          Components: main universe
+          Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+          Architectures: arm64 armhf
+          EOT
+
+          else
+            sudo tee -a /etc/apt/sources.list > /dev/null <<EOT
+          deb [arch=arm64,armhf] http://ports.ubuntu.com/ubuntu-ports $(lsb_release -sc) main universe
+          deb [arch=arm64,armhf] http://ports.ubuntu.com/ubuntu-ports $(lsb_release -sc)-updates main universe
+          deb [arch=arm64,armhf] http://ports.ubuntu.com/ubuntu-ports $(lsb_release -sc)-security main universe
+          EOT
+          fi
+
       - name: Build TFLite Runtime
         run: |
           set -eux
