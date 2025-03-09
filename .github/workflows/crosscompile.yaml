@@ -110,7 +110,7 @@ jobs:
           # ========== 4) Clone TensorFlow ==========
           git clone https://github.com/tensorflow/tensorflow.git
           cd tensorflow
-          git checkout tags/v${TFLITE_VERSION} || git checkout tags/v${TFLITE_VERSION}-rc0
+          git checkout tags/v${TFLITE_VERSION}
 
           # ========== 5) Architecture-specific Flags ==========
           ARCH_FLAGS=""
