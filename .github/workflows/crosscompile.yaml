@@ -2,12 +2,15 @@ name: cross_compilation
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
 
 permissions:
   contents: write  # Ensure GITHUB_TOKEN can create releases
 
 env:
-  TFLITE_VERSION: "2.17.1"
+  TFLITE_VERSION: "2.18.0"
 
 jobs:
   build-tflite-runtime:
