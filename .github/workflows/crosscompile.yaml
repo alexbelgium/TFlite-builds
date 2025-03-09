@@ -14,7 +14,7 @@ env:
 
 jobs:
   build-tflite-runtime:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
@@ -100,6 +100,9 @@ jobs:
             python$PYTHON_VERSION build-essential lld git zip unzip pkg-config curl \
             python$PYTHON_VERSION-dev python$PYTHON_VERSION-venv
 
+          # Build for glibc 2.35
+          sudo debootstrap --arch=amd64 jammy /opt/ubuntu22-sysroot http://archive.ubuntu.com/ubuntu/
+
           # ========== 2) Install Bazel (x86_64 binary is fine; we just pass cross-compilation flags) ==========
           sudo curl -sSL https://github.com/bazelbuild/bazelisk/releases/download/v1.24.1/bazelisk-linux-amd64 -o /usr/local/bin/bazel
           sudo chmod +x /usr/local/bin/bazel
@@ -159,8 +162,9 @@ jobs:
             --copt=-O3 \
             --copt=-flto \
             --linkopt=-flto \
-            --copt=-fdata-sections \
-            --linkopt=-Wl,--gc-sections \
+            --copt=--sysroot=/opt/ubuntu22-sysroot \
+            --linkopt=-Wl,--rpath=/opt/ubuntu22-sysroot/lib \
+            --linkopt=-Wl,--dynamic-linker=/opt/ubuntu22-sysroot/lib/ld-linux-x86-64.so.2 \
             --copt=-DGLIBCXX_USE_CXX11_ABI=0 \
             --verbose_failures \
             --announce_rc"
