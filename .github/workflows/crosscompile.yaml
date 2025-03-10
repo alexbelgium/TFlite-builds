@@ -164,6 +164,9 @@ jobs:
             --copt=-DNDEBUG \
             --copt=-O3 \
             --copt=-flto \
+            --copt=-DGLIBCXX_USE_CXX11_ABI=0 \
+            --copt=-fdata-sections \
+            --linkopt=-Wl,--gc-sections \
             --linkopt=-flto \
             --config=noaws \
             --config=nohdfs \
@@ -171,7 +174,6 @@ jobs:
             --config=nokafka \
             --config=nonccl \
             --config=v2 \
-            --copt=-DGLIBCXX_USE_CXX11_ABI=0 \
             --verbose_failures \
             --announce_rc"
           ./tensorflow/lite/tools/pip_package/build_pip_package_with_bazel.sh $ARCH_FLAGS
