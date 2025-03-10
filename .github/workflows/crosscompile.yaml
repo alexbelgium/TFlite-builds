@@ -98,9 +98,6 @@ jobs:
             python${{ matrix.python }} build-essential lld git zip unzip pkg-config curl \
             python${{ matrix.python }}-dev python${{ matrix.python }}-venv debootstrap
 
-          # Build for glibc 2.35
-          sudo debootstrap --arch=amd64 jammy /opt/ubuntu22-sysroot http://archive.ubuntu.com/ubuntu/
-
           # ========== 2) Install Bazel (x86_64 binary is fine; we just pass cross-compilation flags) ==========
           sudo curl -sSL https://github.com/bazelbuild/bazelisk/releases/download/v1.24.1/bazelisk-linux-amd64 -o /usr/local/bin/bazel
           sudo chmod +x /usr/local/bin/bazel
@@ -125,7 +122,7 @@ jobs:
               sudo dpkg --add-architecture arm64
               sudo apt-get clean
               sudo apt-get update
-              sudo apt-get install -y gcc-aarch64-linux-gnu libpython${{ matrix.python }}-dev:arm64 \
+              sudo apt-get install --no-install-recommends -y gcc-aarch64-linux-gnu libpython${{ matrix.python }}-dev:arm64 \
                libpython${{ matrix.python }}-stdlib:arm64 libpython${{ matrix.python }}:arm64
             ;;
             *)
