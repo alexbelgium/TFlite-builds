@@ -155,6 +155,7 @@ jobs:
             --define=tflite_enable_xnnpack=true \
             --define=xnnpack_enable_subgraph_reshaping=true \
             --define=tflite_convert_with_select_tf_ops=true \
+            --define=tflite_pip_with_flex=true \
             --define=with_select_tf_ops=true \
             --define=no_tensorflow_py_deps=true \
             --define=tflite_with_flex=true \
