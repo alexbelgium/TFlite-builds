@@ -103,6 +103,9 @@ jobs:
           sudo chmod +x /usr/local/bin/bazel
           echo "Bazel version is $(bazel --version)"
 
+          # Build for glibc 2.35
+          sudo debootstrap --arch=amd64 jammy /opt/ubuntu22-sysroot http://archive.ubuntu.com/ubuntu/
+
           # ========== 3) Create and Activate Python Virtual Env ==========
           python${{ matrix.python }} -m venv /tmp/tflite_env
           source /tmp/tflite_env/bin/activate
