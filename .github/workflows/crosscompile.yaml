@@ -27,15 +27,15 @@ jobs:
       - name: Prepare Namings
         id: prepare_names
         run: |
-          echo "python_version=${{ matrix.python }}" | sed 's/\.//g' >> $GITHUB_ENV
+          echo "python_version_name=${{ matrix.python }}" | sed 's/\.//g' >> $GITHUB_ENV
           case "${{ matrix.arch }}" in
             x86_64|aarch64)
-              echo "tflite_version=${TFLITE_VERSION}" >> $GITHUB_ENV
-              echo "arch_version=${{ matrix.arch }}" >> $GITHUB_ENV
+              echo "tflite_version_name=${TFLITE_VERSION}" >> $GITHUB_ENV
+              echo "arch_version_name=${{ matrix.arch }}" >> $GITHUB_ENV
             ;;
             x86_64_noavx)
-              echo "tflite_version=${TFLITE_VERSION}_noavx" >> $GITHUB_ENV
-              echo "arch_version=x86_64" >> $GITHUB_ENV
+              echo "tflite_version_name=${TFLITE_VERSION}_noavx" >> $GITHUB_ENV
+              echo "arch_version_name=x86_64" >> $GITHUB_ENV
             ;;
             *)
               echo "Warning: Unknown architecture ${{ matrix.arch }}"
@@ -88,17 +88,15 @@ jobs:
         run: |
           set -eux
 
-          ARCH="${{ matrix.arch }}"
-          PYTHON_VERSION="${{ matrix.python }}"
-          echo "Building TFLite Runtime for $ARCH / Python $PYTHON_VERSION"
+          echo "Building TFLite Runtime for ${{ matrix.arch }} / Python ${{ matrix.python }}"
 
           # ========== 1) Install System Dependencies ==========
           sudo add-apt-repository ppa:deadsnakes/ppa
           sudo apt-get update
           # Use Clang (and Clang++), remove direct gcc/g++ unless needed for cross-compile
           sudo apt-get install -y \
-            python$PYTHON_VERSION build-essential lld git zip unzip pkg-config curl \
-            python$PYTHON_VERSION-dev python$PYTHON_VERSION-venv debootstrap
+            python${{ matrix.python }} build-essential lld git zip unzip pkg-config curl \
+            python${{ matrix.python }}-dev python${{ matrix.python }}-venv debootstrap
 
           # Build for glibc 2.35
           sudo debootstrap --arch=amd64 jammy /opt/ubuntu22-sysroot http://archive.ubuntu.com/ubuntu/
@@ -109,7 +107,7 @@ jobs:
           echo "Bazel version is $(bazel --version)"
 
           # ========== 3) Create and Activate Python Virtual Env ==========
-          python${PYTHON_VERSION} -m venv /tmp/tflite_env
+          python${{ matrix.python }} -m venv /tmp/tflite_env
           source /tmp/tflite_env/bin/activate
           pip install --upgrade pip wheel numpy auditwheel setuptools
 
@@ -119,28 +117,25 @@ jobs:
           git checkout tags/v${TFLITE_VERSION}
 
           # ========== 5) Architecture-specific Flags ==========
-          ARCH_FLAGS=""
-          case "$ARCH" in
-            x86_64*) ARCH_FLAGS="native";;
+          ARCH_FLAG=""
+          case "${{ matrix.arch }}" in
+            x86_64*) ARCH_FLAG="native";;
             aarch64)
-              ARCH_FLAGS="aarch64"
+              ARCH_FLAG="aarch64"
               sudo dpkg --add-architecture arm64
               sudo apt-get clean
               sudo apt-get update
-              sudo apt-get install --no-install-recommends -y gcc-aarch64-linux-gnu libpython${PYTHON_VERSION}-dev:arm64
-              # DEBUG TEXT
-              find /usr/include -name "pyconfig.h"
-              clang --target=aarch64-linux-gnu --version
+              sudo apt-get install --no-install-recommends -y gcc-aarch64-linux-gnu libpython${{ matrix.python }}-dev:arm64
             ;;
             *)
-              echo "Unknown ARCH '$ARCH'"
+              echo "Unknown ARCH '${{ matrix.arch }}'"
               exit 1
               ;;
           esac
 
           # ========== 5) Build-specific Flags ==========
           NOAVX=""
-          if [[ "$ARCH" == "x86_64_noavx" ]]; then
+          if [[ "${{ matrix.arch }}" == "x86_64_noavx" ]]; then
             NOAVX="--cpu=core2 --copt=-mno-avx --copt=-mno-avx2 --copt=-msse4.2 --copt=-msse4.1"
           fi
 
@@ -149,7 +144,7 @@ jobs:
           export CXX=clang++
 
           # ========== 7) Build the TFLite Runtime ==========
-          export TF_PYTHON_VERSION="$PYTHON_VERSION"
+          export TF_PYTHON_VERSION="${{ matrix.python }}"
           export PYTHON=$(which python)
 
           # Add flexdelegate to the build
@@ -183,7 +178,7 @@ jobs:
             --config=nonccl \        # Disable NVIDIA NCCL support.
             --verbose_failures \ # Easier debug
             --announce_rc" # Easier debug
-          ./tensorflow/lite/tools/pip_package/build_pip_package_with_bazel.sh $ARCH_FLAGS
+          ./tensorflow/lite/tools/pip_package/build_pip_package_with_bazel.sh $ARCH_FLAG
           
           # ========== 8) Locate and Rename the Wheel ==========
            mkdir -p /home/runner/work/wheels
@@ -192,7 +187,7 @@ jobs:
              echo "Error: No wheel file found!"
              exit 1
            fi
-           NEW_WHEEL_PATH="/home/runner/work/wheels/tflite_runtime-${{ env.tflite_version }}-cp${{ env.python_version }}-cp${{ env.python_version }}-linux_${{ env.arch_version }}.whl"
+           NEW_WHEEL_PATH="/home/runner/work/wheels/tflite_runtime-${{ env.tflite_version_name }}-cp${{ env.python_version_name }}-cp${{ env.python_version_name }}-linux_${{ env.arch_version_name }}.whl"
            mv "$WHEEL_PATH" "$NEW_WHEEL_PATH"
            echo "Wheel created: $NEW_WHEEL_PATH"
 
@@ -205,7 +200,7 @@ jobs:
       - name: Upload Wheel Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: tflite_runtime-${{ env.tflite_version }}-cp${{ env.python_version }}-cp${{ env.python_version }}-linux_${{ env.arch_version }}
+          name: tflite_runtime-${{ env.tflite_version_name }}-cp${{ env.python_version_name }}-cp${{ env.python_version_name }}-linux_${{ env.arch_version_name }}
           path: /home/runner/work/wheels/*.whl
 
   release:
