@@ -146,7 +146,8 @@ jobs:
           # Install Flex Delegate
           #CUSTOM_BAZEL_FLAGS+="--define=tflite_pip_with_flex=true "
           sed -i "/builtin_ops_all_linked/a\        \"//tensorflow/lite/delegates/flex:delegate\"," tensorflow/lite/BUILD
-          CUSTOM_BAZEL_FLAGS+="--define=tflite_convert_with_select_tf_ops=true "
+          #CUSTOM_BAZEL_FLAGS+="--define=tflite_convert_with_select_tf_ops=true "
+          CUSTOM_BAZEL_FLAGS+="--define=with_select_tf_ops=true"
           # Reduce size (--copt=-O3 already included)
           CUSTOM_BAZEL_FLAGS+="--copt=-flto --linkopt=-flto "
           # Fix specific issues
