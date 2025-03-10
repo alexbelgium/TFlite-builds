@@ -151,31 +151,38 @@ jobs:
           # ========== 7) Build the TFLite Runtime ==========
           export TF_PYTHON_VERSION="$PYTHON_VERSION"
           export PYTHON=$(which python)
+
+          # Add flexdelegate to the build
+          sed -i "/builtin_ops_all_linked/a\        \"//tensorflow/lite/delegates/flex:delegate\"," tensorflow/lite/BUILD
+
           CUSTOM_BAZEL_FLAGS="$NOAVX |
-            --define=tflite_enable_xnnpack=true \
-            --define=xnnpack_enable_subgraph_reshaping=true \
-            --define=tflite_convert_with_select_tf_ops=true \
+            --define=tflite_enable_xnnpack=true \                   # Xnnpack support
+            --define=xnnpack_enable_subgraph_reshaping=true \       # Reshaping support
+            --define=tflite_convert_with_select_tf_ops=true \       # Add flexdelegate
             --define=tflite_pip_with_flex=true \
             --define=with_select_tf_ops=true \
             --define=no_tensorflow_py_deps=true \
-            --define=tflite_with_flex=true \
             --strip=always \
-            --config=monolithic \
             --copt=-DNDEBUG \
             --copt=-O3 \
             --copt=-flto \
-            --copt=-DGLIBCXX_USE_CXX11_ABI=0 \
-            --copt=-fdata-sections \
-            --linkopt=-Wl,--gc-sections \
             --linkopt=-flto \
-            --config=noaws \
-            --config=nohdfs \
-            --config=noignite \
-            --config=nokafka \
-            --config=nonccl \
-            --config=v2 \
-            --verbose_failures \
-            --announce_rc"
+            --config=mkl \            # Build with MKL support.
+            --config=monolithic \     # Config for mostly static monolithic build.
+            --config=gdr \            # Build with GDR support.
+            --config=verbs \          # Build with libverbs support.
+            --config=ngraph \         # Build with Intel nGraph support.
+            --config=numa \           # Build with NUMA support.
+            --config=dynamic_kernels \    # (Experimental) Build kernels into separate shared objects.
+            --config=v2 \             # Build TensorFlow 2.x instead of 1.x.
+            --config=noaws \         # Disable AWS S3 filesystem support.
+            --config=nogcp \         # Disable GCP support.
+            --config=nohdfs \        # Disable HDFS support.
+            --config=noignite \      # Disable Apache Ignite support.
+            --config=nokafka \       # Disable Apache Kafka support.
+            --config=nonccl \        # Disable NVIDIA NCCL support.
+            --verbose_failures \ # Easier debug
+            --announce_rc" # Easier debug
           ./tensorflow/lite/tools/pip_package/build_pip_package_with_bazel.sh $ARCH_FLAGS
           
           # ========== 8) Locate and Rename the Wheel ==========
