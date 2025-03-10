@@ -140,13 +140,11 @@ jobs:
           export PYTHON=$(which python)
 
           # Add flexdelegate to the build
-          sed -i "/builtin_ops_all_linked/a\        \"//tensorflow/lite/delegates/flex:delegate\"," tensorflow/lite/BUILD
+          # sed -i "/builtin_ops_all_linked/a\        \"//tensorflow/lite/delegates/flex:delegate\"," tensorflow/lite/BUILD
 
           export CUSTOM_BAZEL_FLAGS="$NOAVX \
             --define=tflite_enable_xnnpack=true \                   # Xnnpack support
             --define=xnnpack_enable_subgraph_reshaping=true \       # Reshaping support
-            --define=tflite_convert_with_select_tf_ops=true \       # Add flexdelegate
-            --define=with_select_tf_ops=true \
             --define=tflite_pip_with_flex=true \
             --define=no_tensorflow_py_deps=true \
             --copt=-DNDEBUG \
@@ -154,8 +152,7 @@ jobs:
             --copt=-flto \
             --strip=always \
             --linkopt=-flto \
-            --verbose_failures \ # Easier debug
-            --announce_rc" # Easier debug
+            --verbose_failures" # Easier debug # Easier debug
           ./tensorflow/lite/tools/pip_package/build_pip_package_with_bazel.sh $ARCH_FLAG
           
           # ========== 8) Locate and Rename the Wheel ==========
