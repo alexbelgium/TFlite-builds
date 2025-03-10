@@ -107,6 +107,8 @@ jobs:
           sudo debootstrap --arch=amd64 jammy /opt/ubuntu22-sysroot http://archive.ubuntu.com/ubuntu/
 
           # ========== 3) Create and Activate Python Virtual Env ==========
+          PYTHON_BIN="/usr/bin/python${{ matrix.python }}"
+          VENV_DIR="/tmp/tflite_env"
           python${{ matrix.python }} -m venv /tmp/tflite_env
           source /tmp/tflite_env/bin/activate
           pip install --upgrade pip wheel numpy auditwheel setuptools
