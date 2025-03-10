@@ -144,7 +144,7 @@ jobs:
 
           CUSTOM_BAZEL_FLAGS="$NOAVX"
           CUSTOM_BAZEL_FLAGS+="--define=tflite_enable_xnnpack=true --define=xnnpack_enable_subgraph_reshaping=true "
-          CUSTOM_BAZEL_FLAGS+="--features=-layering_check "
+          #CUSTOM_BAZEL_FLAGS+="--features=-layering_check "
           #CUSTOM_BAZEL_FLAGS+="--define=tflite_pip_with_flex=true "
           #CUSTOM_BAZEL_FLAGS+="--copt=-O3 --copt=-flto --linkopt=-flto "
           #CUSTOM_BAZEL_FLAGS+="--define=no_tensorflow_py_deps=true --copt=-DNDEBUG --strip=always "
