@@ -150,12 +150,13 @@ jobs:
           # Add flexdelegate to the build
           sed -i "/builtin_ops_all_linked/a\        \"//tensorflow/lite/delegates/flex:delegate\"," tensorflow/lite/BUILD
 
-          CUSTOM_BAZEL_FLAGS="$NOAVX |
+          export CUSTOM_BAZEL_FLAGS="$NOAVX |
             --define=tflite_enable_xnnpack=true \                   # Xnnpack support
             --define=xnnpack_enable_subgraph_reshaping=true \       # Reshaping support
             --define=tflite_convert_with_select_tf_ops=true \       # Add flexdelegate
-            --define=tflite_pip_with_flex=true \
             --define=with_select_tf_ops=true \
+            --define=tflite_pip_with_flex=true \
+            --define=tflite_convert_with_select_tf_ops=true \
             --define=no_tensorflow_py_deps=true \
             --strip=always \
             --copt=-DNDEBUG \
