@@ -169,7 +169,6 @@ jobs:
             --config=noaws \         # Disable AWS S3 filesystem support.
             --config=nogcp \         # Disable GCP support.
             --config=nohdfs \        # Disable HDFS support.
-            --config=noignite \      # Disable Apache Ignite support.
             --config=nokafka \       # Disable Apache Kafka support.
             --config=nonccl \        # Disable NVIDIA NCCL support.
             --verbose_failures \ # Easier debug
