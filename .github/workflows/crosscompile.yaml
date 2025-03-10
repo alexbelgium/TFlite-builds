@@ -154,6 +154,8 @@ jobs:
           CUSTOM_BAZEL_FLAGS="$NOAVX |
             --define=tflite_enable_xnnpack=true \
             --define=xnnpack_enable_subgraph_reshaping=true \
+            --define=tflite_convert_with_select_tf_ops=true \
+            --define=with_select_tf_ops=true \
             --define=no_tensorflow_py_deps=true \
             --define=tflite_with_flex=true \
             --strip=always \
@@ -162,20 +164,12 @@ jobs:
             --copt=-O3 \
             --copt=-flto \
             --linkopt=-flto \
-            --copt=--sysroot=/opt/ubuntu22-sysroot \
-            --linkopt=-Wl,--rpath=/opt/ubuntu22-sysroot/lib \
-            --linkopt=-Wl,--dynamic-linker=/opt/ubuntu22-sysroot/lib/ld-linux-x86-64.so.2 \
-            --copt=-fdata-sections \
-            --linkopt=-Wl,--gc-sections \
-            --config=monolithic \
             --config=noaws \
             --config=nohdfs \
             --config=noignite \
             --config=nokafka \
             --config=nonccl \
             --config=v2 \
-            --define=tflite_convert_with_select_tf_ops=true \
-            --define=with_select_tf_ops=true \
             --copt=-DGLIBCXX_USE_CXX11_ABI=0 \
             --verbose_failures \
             --announce_rc"
