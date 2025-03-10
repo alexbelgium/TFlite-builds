@@ -142,17 +142,16 @@ jobs:
           # Add flexdelegate to the build
           # sed -i "/builtin_ops_all_linked/a\        \"//tensorflow/lite/delegates/flex:delegate\"," tensorflow/lite/BUILD
 
-          export CUSTOM_BAZEL_FLAGS="\
-            --define=tflite_enable_xnnpack=true \                   # Xnnpack support
-            --define=xnnpack_enable_subgraph_reshaping=true \       # Reshaping support
-            --define=tflite_pip_with_flex=true \
-            --define=no_tensorflow_py_deps=true \
-            --copt=-DNDEBUG \
-            --copt=-O3 \
-            --copt=-flto \
-            --strip=always \
-            --linkopt=-flto \
-            --verbose_failures \
+          export CUSTOM_BAZEL_FLAGS="--define=tflite_enable_xnnpack=true |
+            --define=xnnpack_enable_subgraph_reshaping=true |
+            --define=tflite_pip_with_flex=true |
+            --define=no_tensorflow_py_deps=true |
+            --copt=-DNDEBUG |
+            --copt=-O3 |
+            --copt=-flto |
+            --strip=always |
+            --linkopt=-flto |
+            --verbose_failures |
             $NOAVX"
           ./tensorflow/lite/tools/pip_package/build_pip_package_with_bazel.sh $ARCH_FLAG
           
