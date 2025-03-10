@@ -43,6 +43,47 @@ jobs:
               ;;
           esac
 
+      - name: Configure arm64 Repositories
+        if: matrix.arch == 'aarch64'
+        run: |
+          [[ "$(lsb_release -si)" == "Ubuntu" ]] || exit 0
+          sudo sed -i "s/deb\ /deb \[arch=amd64\]\ /g" /etc/apt/sources.list
+
+          if [[ "$(lsb_release -sc)" == "noble" ]]; then
+            echo "NOBLE"
+            sudo rm -f /etc/apt/sources.list.d/ubuntu.sources
+            sudo tee /etc/apt/sources.list.d/ubuntu.sources > /dev/null <<EOT
+          Types: deb
+          URIs: http://archive.ubuntu.com/ubuntu/
+          Suites: noble noble-updates noble-backports
+          Components: main universe restricted multiverse
+          Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+          Architectures: amd64
+
+          ## Ubuntu security updates
+          Types: deb
+          URIs: http://security.ubuntu.com/ubuntu/
+          Suites: noble-security
+          Components: main universe restricted multiverse
+          Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+          Architectures: amd64
+
+          Types: deb
+          URIs: http://ports.ubuntu.com/ubuntu-ports
+          Suites: noble noble-updates noble-security
+          Components: main universe
+          Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+          Architectures: arm64 armhf
+          EOT
+
+          else
+            sudo tee -a /etc/apt/sources.list > /dev/null <<EOT
+          deb [arch=arm64,armhf] http://ports.ubuntu.com/ubuntu-ports $(lsb_release -sc) main universe
+          deb [arch=arm64,armhf] http://ports.ubuntu.com/ubuntu-ports $(lsb_release -sc)-updates main universe
+          deb [arch=arm64,armhf] http://ports.ubuntu.com/ubuntu-ports $(lsb_release -sc)-security main universe
+          EOT
+          fi
+
       - name: Build TFLite Runtime
         run: |
           set -eux
@@ -56,22 +97,27 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y python${{ matrix.python }} python${{ matrix.python }}-dev python${{ matrix.python }}-venv build-essential clang git zip unzip curl pkg-config
 
+          # ========== 2) Create and Activate Python Virtual Env ==========
           python${{ matrix.python }} -m venv /tmp/tflite_env
           source /tmp/tflite_env/bin/activate
           pip install --upgrade pip wheel numpy setuptools auditwheel
 
+          # ========== 3) Install Bazel (x86_64 binary is fine; we just pass cross-compilation flags) ==========
           curl -sSL https://github.com/bazelbuild/bazelisk/releases/download/v1.24.1/bazelisk-linux-amd64 -o /usr/local/bin/bazel
           chmod +x /usr/local/bin/bazel
 
+          # ========== 4) Clone TensorFlow ==========
           git clone https://github.com/tensorflow/tensorflow.git
           cd tensorflow
           git checkout tags/v${TFLITE_VERSION}
 
+          # ========== 5) Architecture-specific Flags ==========
           case "${{ matrix.arch }}" in
             x86_64*) ARCH_FLAGS="native";;
             aarch64)
               ARCH_FLAGS="aarch64"
               sudo dpkg --add-architecture arm64
+              sudo apt-get clean
               sudo apt-get update
               sudo apt-get install -y gcc-aarch64-linux-gnu libpython${{ matrix.python }}-dev:arm64
               ;;
@@ -81,20 +127,24 @@ jobs:
               ;;
           esac
 
+          # ========== 6) Build-specific Flags ==========
           NOAVX=""
           if [[ "${{ matrix.arch }}" == "x86_64_noavx" ]]; then
             NOAVX="--cpu=core2 --copt=-mno-avx --copt=-mno-avx2"
           fi
 
+          # ========== 7) Use Clang as compiler ==========
           export CC=clang
           export CXX=clang++
 
+          # ========== 8) Build the TFLite Runtime ==========
           CUSTOM_BAZEL_FLAGS="\
             $NOAVX \
             --define=tflite_enable_xnnpack=true \
             --define=xnnpack_enable_subgraph_reshaping=true \
-            --define=tflite_with_flex=true \
             --define=no_tensorflow_py_deps=true \
+            --define=tflite_with_flex=true \
+            --define=flex_delegate=true \
             --strip=always \
             --config=monolithic \
             --copt=-DNDEBUG \
@@ -111,17 +161,12 @@ jobs:
             --config=v2 \
             --define=tflite_convert_with_select_tf_ops=true \
             --define=with_select_tf_ops=true \
-            --define=flex_delegate=true \
-            --define=tflite_with_flex=true \
-            --define=tflite_enable_xnnpack=true \
-            --define=xnnpack_enable_subgraph_reshaping=true"
-
-          git clone https://github.com/tensorflow/tensorflow.git
-          cd tensorflow
-          git checkout tags/v${TFLITE_VERSION}
-
+            --copt=-DGLIBCXX_USE_CXX11_ABI=0 \
+            --verbose_failures \
+            --announce_rc"
           ./tensorflow/lite/tools/pip_package/build_pip_package_with_bazel.sh $ARCH_FLAGS
-
+          
+          # ========== 9) Locate and Rename the Wheel ==========
           mkdir -p /home/runner/work/wheels
           WHEEL_PATH=$(find tensorflow/lite/tools/pip_package/gen/tflite_pip/python3/dist -name "*.whl" | head -n 1)
           mv "$WHEEL_PATH" "/home/runner/work/wheels/tflite_runtime-${{ env.tflite_version }}-cp${{ env.python_version }}-linux_${{ env.arch_version }}.whl"
