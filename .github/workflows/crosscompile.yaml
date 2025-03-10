@@ -143,12 +143,16 @@ jobs:
           # sed -i "/builtin_ops_all_linked/a\        \"//tensorflow/lite/delegates/flex:delegate\"," tensorflow/lite/BUILD
 
           CUSTOM_BAZEL_FLAGS="$NOAVX"
+          # Install XNNPACK
           CUSTOM_BAZEL_FLAGS+="--define=tflite_enable_xnnpack=true --define=xnnpack_enable_subgraph_reshaping=true "
-          CUSTOM_BAZEL_FLAGS+="--define=no_tensorflow_py_deps=true --copt=-DNDEBUG --strip=always "
-          CUSTOM_BAZEL_FLAGS+="--verbose_failures "
+          CUSTOM_BAZEL_FLAGS+="--define=no_tensorflow_py_deps=true --copt=-DNDEBUG --strip=always "          
           #CUSTOM_BAZEL_FLAGS+="--define=tflite_pip_with_flex=true "
-          #CUSTOM_BAZEL_FLAGS+="--features=-layering_check "
-          #CUSTOM_BAZEL_FLAGS+="--copt=-flto --linkopt=-flto "
+          # Reduce size (--copt=-O3 already included)
+          CUSTOM_BAZEL_FLAGS+="--copt=-flto --linkopt=-flto "
+          # Fix specific issues
+          CUSTOM_BAZEL_FLAGS+="--features=-layering_check "
+          # Debug
+          CUSTOM_BAZEL_FLAGS+="--verbose_failures "
 
           export CUSTOM_BAZEL_FLAGS
           ./tensorflow/lite/tools/pip_package/build_pip_package_with_bazel.sh $ARCH_FLAG
