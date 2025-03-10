@@ -7,14 +7,14 @@ on:
       - main
 
 permissions:
-  contents: write  # Ensure GITHUB_TOKEN can create releases
+  contents: write
 
 env:
   TFLITE_VERSION: "2.17.1"
 
 jobs:
   build-tflite-runtime:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     strategy:
       fail-fast: false
       matrix:
