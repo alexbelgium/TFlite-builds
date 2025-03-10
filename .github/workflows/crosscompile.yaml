@@ -128,7 +128,7 @@ jobs:
 
           NOAVX=""
           if [[ "${{ matrix.arch }}" == "x86_64_noavx" ]]; then
-            NOAVX="--cpu=core2 --copt=-mno-avx --copt=-mno-avx2 --copt=-msse4.2 --copt=-msse4.1 "
+            NOAVX="--copt=-mno-avx --copt=-mno-avx2 --copt=-msse4.2 --copt=-msse4.1 "
           fi
 
           # ========== 6) Use Clang as compiler ==========
