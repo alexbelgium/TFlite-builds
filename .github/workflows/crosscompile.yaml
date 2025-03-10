@@ -19,7 +19,7 @@ jobs:
       fail-fast: false
       matrix:
         arch: [x86_64,x86_64_noavx,aarch64]
-        python: ["3.9","3.10","3.11","3.12"]
+        python: ["3.9","3.10","3.11"]
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -125,8 +125,7 @@ jobs:
               sudo dpkg --add-architecture arm64
               sudo apt-get clean
               sudo apt-get update
-              sudo apt-get install --no-install-recommends -y gcc-aarch64-linux-gnu libpython${{ matrix.python }}-dev:arm64 \
-               libpython${{ matrix.python }}-stdlib:arm64 libpython${{ matrix.python }}:arm64
+              sudo apt-get install --no-install-recommends -y gcc-aarch64-linux-gnu libpython${{ matrix.python }}-dev:arm64
             ;;
             *)
               echo "Unknown ARCH '${{ matrix.arch }}'"
