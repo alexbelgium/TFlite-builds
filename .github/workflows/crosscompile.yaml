@@ -11,22 +11,21 @@ permissions:
 
 env:
   TFLITE_VERSION: "2.17.1"
-  CHROOT_DIR: "/opt/ubuntu22-chroot"
 
 jobs:
   build-tflite-runtime:
-    runs-on: ubuntu-noble
+    runs-on: ubuntu-22.04
     strategy:
       fail-fast: false
       matrix:
-        arch: [x86_64, x86_64_noavx, aarch64]
-        python: ["3.9", "3.10", "3.11", "3.12"]
-
+        arch: [x86_64,x86_64_noavx,aarch64]
+        python: ["3.9","3.10","3.11"]
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Set Environment Variables
+      - name: Prepare Namings
+        id: prepare_names
         run: |
           echo "python_version_name=${{ matrix.python }}" | sed 's/\.//g' >> $GITHUB_ENV
           case "${{ matrix.arch }}" in
@@ -39,40 +38,10 @@ jobs:
               echo "arch_version_name=x86_64" >> $GITHUB_ENV
             ;;
             *)
-              echo "Unknown architecture: ${{ matrix.arch }}"
+              echo "Warning: Unknown architecture ${{ matrix.arch }}"
               exit 1
             ;;
           esac
-
-      - name: Install Dependencies
-        run: |
-          sudo apt update && sudo apt install -y debootstrap schroot lld clang curl git
-
-      - name: Create Ubuntu 22.04 Chroot
-        run: |
-          sudo debootstrap --variant=buildd --arch=amd64 jammy $CHROOT_DIR http://archive.ubuntu.com/ubuntu/
-          echo "Ubuntu 22.04 chroot created at $CHROOT_DIR"
-
-      - name: Configure Chroot
-        run: |
-          echo "Setting up chroot..."
-          sudo mount --bind /dev $CHROOT_DIR/dev
-          sudo mount --bind /proc $CHROOT_DIR/proc
-          sudo mount --bind /sys $CHROOT_DIR/sys
-          sudo mount --bind /run $CHROOT_DIR/run
-
-          # Ensure Clang and dependencies inside chroot
-          sudo chroot $CHROOT_DIR /bin/bash -c "
-            apt update && apt install -y build-essential lld git zip unzip pkg-config curl python${{ matrix.python }} python${{ matrix.python }}-dev python${{ matrix.python }}-venv
-          "
-
-      - name: Install Bazel Inside Chroot
-        run: |
-          sudo chroot $CHROOT_DIR /bin/bash -c "
-            curl -sSL https://github.com/bazelbuild/bazelisk/releases/download/v1.24.1/bazelisk-linux-amd64 -o /usr/local/bin/bazel
-            chmod +x /usr/local/bin/bazel
-            echo 'Bazel version is ' \$(bazel --version)
-          "
 
       - name: Configure arm64 Repositories
         if: matrix.arch == 'aarch64'
@@ -115,76 +84,112 @@ jobs:
           EOT
           fi
 
-
-      - name: Build TFLite Runtime in Chroot
+      - name: Build TFLite Runtime
         run: |
-          sudo chroot $CHROOT_DIR /bin/bash -c "
-            set -eux
-            echo 'Building TFLite Runtime for ${{ matrix.arch }} / Python ${{ matrix.python }}'
+          set -eux
 
-            # Create and Activate Python Virtual Env
-            python${{ matrix.python }} -m venv /tmp/tflite_env
-            source /tmp/tflite_env/bin/activate
-            pip install --upgrade pip wheel numpy auditwheel setuptools
+          echo "Building TFLite Runtime for ${{ matrix.arch }} / Python ${{ matrix.python }}"
 
-            # Clone TensorFlow
-            git clone https://github.com/tensorflow/tensorflow.git
-            cd tensorflow
-            git checkout tags/v${TFLITE_VERSION}
+          # ========== 1) Install System Dependencies ==========
+          sudo add-apt-repository ppa:deadsnakes/ppa
+          sudo apt-get update
+          # Use Clang (and Clang++), remove direct gcc/g++ unless needed for cross-compile
+          sudo apt-get install -y \
+            python${{ matrix.python }} build-essential lld git zip unzip pkg-config curl \
+            python${{ matrix.python }}-dev python${{ matrix.python }}-venv debootstrap
 
-            # Configure Architecture Flags
-            ARCH_FLAG=''
-            case '${{ matrix.arch }}' in
-              x86_64*) ARCH_FLAG='native' ;;
-              aarch64)
-                ARCH_FLAG='aarch64'
-                apt-get install -y gcc-aarch64-linux-gnu libpython${{ matrix.python }}-dev:arm64
-              ;;
-              *)
-                echo 'Unknown architecture'
-                exit 1
-            esac
+          # ========== 2) Install Bazel (x86_64 binary is fine; we just pass cross-compilation flags) ==========
+          sudo curl -sSL https://github.com/bazelbuild/bazelisk/releases/download/v1.24.1/bazelisk-linux-amd64 -o /usr/local/bin/bazel
+          sudo chmod +x /usr/local/bin/bazel
+          echo "Bazel version is $(bazel --version)"
 
-            # Configure Clang
-            export CC=clang
-            export CXX=clang++
+          # Build for glibc 2.35
+          sudo debootstrap --arch=amd64 jammy /opt/ubuntu22-sysroot http://archive.ubuntu.com/ubuntu/
 
-            # Build TFLite Runtime
-            CUSTOM_BAZEL_FLAGS='
-              --define=tflite_enable_xnnpack=true
-              --define=tflite_convert_with_select_tf_ops=true
-              --define=tflite_pip_with_flex=true
-              --define=with_select_tf_ops=true
-              --define=no_tensorflow_py_deps=true
-              --strip=always
-              --copt=-DNDEBUG
-              --copt=-O3
-              --copt=-flto
-              --linkopt=-flto
-              --config=monolithic
-              --config=noaws
-              --config=nogcp
-              --config=nohdfs
-              --config=noignite
-              --config=nokafka
-              --config=nonccl
-              --verbose_failures
-              --announce_rc
-            '
+          # ========== 3) Create and Activate Python Virtual Env ==========
+          python${{ matrix.python }} -m venv /tmp/tflite_env
+          source /tmp/tflite_env/bin/activate
+          pip install --upgrade pip wheel numpy auditwheel setuptools
 
-            ./tensorflow/lite/tools/pip_package/build_pip_package_with_bazel.sh \$ARCH_FLAG
+          # ========== 4) Clone TensorFlow ==========
+          git clone https://github.com/tensorflow/tensorflow.git
+          cd tensorflow
+          git checkout tags/v${TFLITE_VERSION}
 
-            # Locate and Rename the Wheel
-            mkdir -p /home/runner/work/wheels
-            WHEEL_PATH=\$(find tensorflow/lite/tools/pip_package/gen/tflite_pip/python3/dist -name '*.whl' | head -n 1)
-            if [[ -z \"\$WHEEL_PATH\" ]]; then
-              echo 'Error: No wheel file found!'
+          # ========== 5) Architecture-specific Flags ==========
+          ARCH_FLAG=""
+          case "${{ matrix.arch }}" in
+            x86_64*) ARCH_FLAG="native";;
+            aarch64)
+              ARCH_FLAG="aarch64"
+              sudo dpkg --add-architecture arm64
+              sudo apt-get clean
+              sudo apt-get update
+              sudo apt-get install --no-install-recommends -y gcc-aarch64-linux-gnu libpython${{ matrix.python }}-dev:arm64
+            ;;
+            *)
+              echo "Unknown ARCH '${{ matrix.arch }}'"
               exit 1
-            fi
-            NEW_WHEEL_PATH='/home/runner/work/wheels/tflite_runtime-${{ env.tflite_version_name }}-cp${{ env.python_version_name }}-cp${{ env.python_version_name }}-linux_${{ env.arch_version_name }}.whl'
-            mv \"\$WHEEL_PATH\" \"\$NEW_WHEEL_PATH\"
-            echo 'Wheel created: ' \"\$NEW_WHEEL_PATH\"
-          "
+              ;;
+          esac
+
+          # ========== 5) Build-specific Flags ==========
+          NOAVX=""
+          if [[ "${{ matrix.arch }}" == "x86_64_noavx" ]]; then
+            NOAVX="--cpu=core2 --copt=-mno-avx --copt=-mno-avx2 --copt=-msse4.2 --copt=-msse4.1"
+          fi
+
+          # ========== 6) Use Clang as compiler ==========
+          export CC=clang
+          export CXX=clang++
+
+          # ========== 7) Build the TFLite Runtime ==========
+          export TF_PYTHON_VERSION="${{ matrix.python }}"
+          export PYTHON=$(which python)
+
+          # Add flexdelegate to the build
+          sed -i "/builtin_ops_all_linked/a\        \"//tensorflow/lite/delegates/flex:delegate\"," tensorflow/lite/BUILD
+
+          CUSTOM_BAZEL_FLAGS="$NOAVX |
+            --define=tflite_enable_xnnpack=true \                   # Xnnpack support
+            --define=xnnpack_enable_subgraph_reshaping=true \       # Reshaping support
+            --define=tflite_convert_with_select_tf_ops=true \       # Add flexdelegate
+            --define=tflite_pip_with_flex=true \
+            --define=with_select_tf_ops=true \
+            --define=no_tensorflow_py_deps=true \
+            --strip=always \
+            --copt=-DNDEBUG \
+            --copt=-O3 \
+            --copt=-flto \
+            --linkopt=-flto \
+            --config=mkl \            # Build with MKL support.
+            --config=monolithic \     # Config for mostly static monolithic build.
+            --config=gdr \            # Build with GDR support.
+            --config=verbs \          # Build with libverbs support.
+            --config=ngraph \         # Build with Intel nGraph support.
+            --config=numa \           # Build with NUMA support.
+            --config=dynamic_kernels \    # (Experimental) Build kernels into separate shared objects.
+            --config=v2 \             # Build TensorFlow 2.x instead of 1.x.
+            --config=noaws \         # Disable AWS S3 filesystem support.
+            --config=nogcp \         # Disable GCP support.
+            --config=nohdfs \        # Disable HDFS support.
+            --config=noignite \      # Disable Apache Ignite support.
+            --config=nokafka \       # Disable Apache Kafka support.
+            --config=nonccl \        # Disable NVIDIA NCCL support.
+            --verbose_failures \ # Easier debug
+            --announce_rc" # Easier debug
+          ./tensorflow/lite/tools/pip_package/build_pip_package_with_bazel.sh $ARCH_FLAG
+          
+          # ========== 8) Locate and Rename the Wheel ==========
+           mkdir -p /home/runner/work/wheels
+           WHEEL_PATH=$(find tensorflow/lite/tools/pip_package/gen/tflite_pip/python3/dist -name "*.whl" | head -n 1)
+           if [[ -z "$WHEEL_PATH" ]]; then
+             echo "Error: No wheel file found!"
+             exit 1
+           fi
+           NEW_WHEEL_PATH="/home/runner/work/wheels/tflite_runtime-${{ env.tflite_version_name }}-cp${{ env.python_version_name }}-cp${{ env.python_version_name }}-linux_${{ env.arch_version_name }}.whl"
+           mv "$WHEEL_PATH" "$NEW_WHEEL_PATH"
+           echo "Wheel created: $NEW_WHEEL_PATH"
 
       - name: List Built Wheels
         run: ls -l /home/runner/work/wheels
