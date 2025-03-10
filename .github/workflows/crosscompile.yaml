@@ -145,8 +145,9 @@ jobs:
           CUSTOM_BAZEL_FLAGS="$NOAVX"
           # Install XNNPACK
           CUSTOM_BAZEL_FLAGS+="--define=tflite_enable_xnnpack=true --define=xnnpack_enable_subgraph_reshaping=true "
-          CUSTOM_BAZEL_FLAGS+="--define=no_tensorflow_py_deps=true --copt=-DNDEBUG --strip=always "          
-          #CUSTOM_BAZEL_FLAGS+="--define=tflite_pip_with_flex=true "
+          CUSTOM_BAZEL_FLAGS+="--define=no_tensorflow_py_deps=true --copt=-DNDEBUG --strip=always "
+          # Install Flex Delegate
+          CUSTOM_BAZEL_FLAGS+="--define=tflite_pip_with_flex=true "
           # Reduce size (--copt=-O3 already included)
           CUSTOM_BAZEL_FLAGS+="--copt=-flto --linkopt=-flto "
           # Fix specific issues
