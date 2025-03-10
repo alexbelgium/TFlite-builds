@@ -156,21 +156,16 @@ jobs:
             --define=tflite_convert_with_select_tf_ops=true \       # Add flexdelegate
             --define=with_select_tf_ops=true \
             --define=tflite_pip_with_flex=true \
-            --define=tflite_convert_with_select_tf_ops=true \
             --define=no_tensorflow_py_deps=true \
-            --strip=always \
             --copt=-DNDEBUG \
             --copt=-O3 \
             --copt=-flto \
-            --linkopt=-flto \
             --config=monolithic \     # Config for mostly static monolithic build.
             --config=dynamic_kernels \    # (Experimental) Build kernels into separate shared objects.
             --config=v2 \             # Build TensorFlow 2.x instead of 1.x.
             --config=noaws \         # Disable AWS S3 filesystem support.
-            --config=nogcp \         # Disable GCP support.
-            --config=nohdfs \        # Disable HDFS support.
-            --config=nokafka \       # Disable Apache Kafka support.
-            --config=nonccl \        # Disable NVIDIA NCCL support.
+            --strip=always \
+            --linkopt=-flto \
             --verbose_failures \ # Easier debug
             --announce_rc" # Easier debug
           ./tensorflow/lite/tools/pip_package/build_pip_package_with_bazel.sh $ARCH_FLAG
