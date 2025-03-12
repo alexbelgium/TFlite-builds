@@ -39,8 +39,9 @@ jobs:
       run: |
         sed -i 's/3.16.8/3.29.6/g' tensorflow/lite/tools/pip_package/Dockerfile.py3
         if [[ "${{ matrix.python_version }}" == "3.11" || "${{ matrix.python_version }}" == "3.12" ]]; then
-          sed -i '/RUN curl -OL https:\/\/bootstrap.pypa.io\/get-pip.py/a\    RUN rm /usr/lib/python$PYTHON_VERSION/EXTERNALLY-MANAGED' tensorflow/lite/tools/pip_package/Dockerfile.py3
+          sed -i '/RUN curl -OL https:\/\/bootstrap.pypa.io\/get-pip.py/a\    RUN rm -f /usr/lib/python${{ matrix.python_version }}/EXTERNALLY-MANAGED' tensorflow/lite/tools/pip_package/Dockerfile.py3
         fi
+        sed -i '/python$PYTHON_VERSION-distutils/d' tensorflow/lite/tools/pip_package/Dockerfile.py3
 
     - name: Configure Makefile
       run: |
