@@ -14,7 +14,7 @@ jobs:
     strategy:
       matrix:
         python_version: ["3.9", "3.10", "3.11"]
-        arch: ["amd64", "aarch64"]
+        arch: ["x86_64", "x86_64-noavx", "aarch64"]
 
     steps:
     - name: Checkout TensorFlow
@@ -38,7 +38,7 @@ jobs:
     - name: Adjust Dockerfile
       run: |
         sed -i 's/3.16.8/3.29.6/g' tensorflow/lite/tools/pip_package/Dockerfile.py3
-        if [[ "${{ matrix.python_version }}" == "3.11" || "${{ matrix.python_version }}" == "3.12" ]]; then
+        if [[ "${{ matrix.python_version }}" == "3.11" ]]; then
           sed -i '/RUN curl -OL https:\/\/bootstrap.pypa.io\/get-pip.py/a\    RUN rm -f /usr/lib/python${{ matrix.python_version }}/EXTERNALLY-MANAGED' tensorflow/lite/tools/pip_package/Dockerfile.py3
         fi
         sed -i '/python$PYTHON_VERSION-distutils/d' tensorflow/lite/tools/pip_package/Dockerfile.py3
@@ -46,18 +46,18 @@ jobs:
     - name: Configure Makefile
       run: |
         sed -i 's/ubuntu:20.04/${{ env.BASE_IMAGE }}/g' tensorflow/lite/tools/pip_package/Makefile
-        if [[ "${{ matrix.python_version }}" == "3.12" ]]; then
-          sed -i 's/^NUMPY_VERSION.*/NUMPY_VERSION ?= 1.26.4/' tensorflow/lite/tools/pip_package/Makefile
-        else
-          sed -i 's/^NUMPY_VERSION.*/NUMPY_VERSION ?= 1.24.4/' tensorflow/lite/tools/pip_package/Makefile
-        fi
+        sed -i 's/^NUMPY_VERSION.*/NUMPY_VERSION ?= 1.24.4/' tensorflow/lite/tools/pip_package/Makefile
 
     - name: Build TFLite Runtime Wheel using Docker
       run: |
         export PYTHON_VERSION="${{ matrix.python_version }}"
-        export NUMPY_VERSION="$( [[ "${{ matrix.python_version }}" == "3.12" ]] && echo "1.26.4" || echo "1.24.4" )"
+        export NUMPY_VERSION="1.24.4"
         export TENSORFLOW_TARGET="${{ matrix.arch }}"
         export CUSTOM_BAZEL_FLAGS="--define=tflite_pip_with_xnnpack=true --define=tflite_pip_with_xnnpack_reshaping=true"
+
+        if [[ "${{ matrix.arch }}" == "x86_64-noavx" ]]; then
+          CUSTOM_BAZEL_FLAGS="$CUSTOM_BAZEL_FLAGS --copt=-mno-avx --copt=-mno-avx2 --copt=-msse4.2 --copt=-msse4.1"
+        fi
 
         BUILD_NUM_JOBS=$(nproc) make -C tensorflow/lite/tools/pip_package docker-build \
           TENSORFLOW_TARGET=$TENSORFLOW_TARGET PYTHON_VERSION=$PYTHON_VERSION CUSTOM_BAZEL_FLAGS="$CUSTOM_BAZEL_FLAGS"
@@ -65,7 +65,7 @@ jobs:
     - name: Upload TFLite Wheel
       uses: actions/upload-artifact@v4
       with:
-        name: tflite_runtime-${{ env.TFLITE_VERSION }}-cp${{ matrix.python_version }}-cp${{ matrix.python_version }}-linux_${{ matrix.arch }}.whl
+        name: tflite_runtime-${{ env.TFLITE_VERSION }}${{ matrix.arch == 'x86_64-noavx' && '_noavx' || '' }}-cp${{ matrix.python_version }}-cp${{ matrix.python_version }}-linux_${{ matrix.arch == 'x86_64-noavx' && 'x86_64' || matrix.arch }}.whl
         path: tensorflow/tensorflow/lite/tools/pip_package/gen/tflite_pip/python${{ matrix.python_version }}/dist/*.whl
 
   release:
