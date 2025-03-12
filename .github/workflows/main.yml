@@ -22,29 +22,38 @@ jobs:
 
     - name: Setup Docker and Dependencies
       run: |
-        sudo apt-get remove -y containerd
         sudo apt update
-        sudo apt install -y docker.io software-properties-common
-        sudo add-apt-repository ppa:deadsnakes/ppa -y
-        sudo apt-get update
-        sudo apt-get install -y \
-          python${{ matrix.python_version }} build-essential lld git zip unzip pkg-config curl \
-          python${{ matrix.python_version }}-dev python${{ matrix.python_version }}-venv gcc-12 clang-17
+        sudo apt install -y docker.io build-essential lld git zip unzip pkg-config curl gcc-12 clang-17
 
-    - name: Adjust Dockerfile for Python >= 3.11
-      if: matrix.python_version == '3.11' || matrix.python_version == '3.12'
+    - name: Adjust Dockerfile
       run: |
-        sed -i '/get-pip.py/a RUN rm /usr/lib/python${PYTHON_VERSION}/EXTERNALLY-MANAGED' tensorflow/lite/tools/pip_package/Dockerfile.py3
+        sed -i 's/3.16.8/3.29.6/g' tensorflow/lite/tools/pip_package/Dockerfile.py3
+        if [[ "${{ matrix.python_version }}" == "3.11" || "${{ matrix.python_version }}" == "3.12" ]]; then
+          sed -i '/RUN curl -OL https:\/\/bootstrap.pypa.io\/get-pip.py/a\    RUN rm /usr/lib/python$PYTHON_VERSION/EXTERNALLY-MANAGED' tensorflow/lite/tools/pip_package/Dockerfile.py3
+        fi
 
     - name: Configure Makefile
       run: |
-        sed -i 's/^BASE_IMAGE.*/BASE_IMAGE ?= ubuntu:22.04/' tensorflow/lite/tools/pip_package/Makefile
-        sed -i 's/^PYTHON_VERSION.*/PYTHON_VERSION ?= ${{ matrix.python_version }}/' tensorflow/lite/tools/pip_package/Makefile
-        sed -i 's/^NUMPY_VERSION.*/NUMPY_VERSION ?= 1.24.4/' tensorflow/lite/tools/pip_package/Makefile
+        sed -i 's/ubuntu:20.04/ubuntu:22.04/g' tensorflow/lite/tools/pip_package/Makefile
+        if [[ "${{ matrix.python_version }}" == "3.12" ]]; then
+          sed -i 's/^NUMPY_VERSION.*/NUMPY_VERSION ?= 1.26.4/' tensorflow/lite/tools/pip_package/Makefile
+        else
+          sed -i 's/^NUMPY_VERSION.*/NUMPY_VERSION ?= 1.24.4/' tensorflow/lite/tools/pip_package/Makefile
+        fi
 
     - name: Build TFLite Runtime Wheel using Docker
       run: |
-        BUILD_NUM_JOBS=$(nproc) make -C tensorflow/lite/tools/pip_package docker-build TENSORFLOW_TARGET=${{ matrix.arch }} PYTHON_VERSION=${{ matrix.python_version }}
+        export BASE_IMAGE="ubuntu:22.04"
+        export PYTHON_VERSION="${{ matrix.python_version }}"
+        if [[ "${{ matrix.python_version }}" == "3.12" ]]; then
+          export NUMPY_VERSION="1.26.4"
+        else
+          export NUMPY_VERSION="1.24.4"
+        fi
+        export TENSORFLOW_TARGET="${{ matrix.arch }}"
+
+        BUILD_NUM_JOBS=$(nproc) make -C tensorflow/lite/tools/pip_package docker-build \
+          TENSORFLOW_TARGET=$TENSORFLOW_TARGET PYTHON_VERSION=$PYTHON_VERSION
 
     - name: Upload TFLite Wheel
       uses: actions/upload-artifact@v4
