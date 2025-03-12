@@ -66,7 +66,7 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: tflite_runtime-${{ env.TFLITE_VERSION }}-cp${{ matrix.python_version }}-cp${{ matrix.python_version }}-linux_${{ matrix.arch }}.whl
-        path: tensorflow/lite/tools/pip_package/gen/tflite_pip/python/dist/*.whl
+        path: tensorflow/tensorflow/lite/tools/pip_package/gen/tflite_pip/python${{ matrix.python_version }}/dist/*.whl
 
   release:
     runs-on: ubuntu-latest
@@ -116,4 +116,4 @@ jobs:
         run: |
           gh release upload v${{ env.TFLITE_VERSION }} wheels/**/*.whl --clobber -R "${{ github.repository }}"
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}"
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
