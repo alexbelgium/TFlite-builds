@@ -4,6 +4,10 @@ on:
   workflow_dispatch:
   push:
 
+env:
+  TFLITE_VERSION: "2.17.1"
+  BASE_IMAGE: "ubuntu:22.04"
+
 jobs:
   build:
     runs-on: ubuntu-22.04
@@ -19,7 +23,7 @@ jobs:
         repository: tensorflow/tensorflow
         submodules: true
         fetch-depth: 0
-        ref: v2.17.1
+        ref: v${{ env.TFLITE_VERSION }}
 
     - name: Setup Docker and Dependencies
       run: |
@@ -40,7 +44,7 @@ jobs:
 
     - name: Configure Makefile
       run: |
-        sed -i 's/ubuntu:20.04/ubuntu:22.04/g' tensorflow/lite/tools/pip_package/Makefile
+        sed -i 's/ubuntu:20.04/${{ env.BASE_IMAGE }}/g' tensorflow/lite/tools/pip_package/Makefile
         if [[ "${{ matrix.python_version }}" == "3.12" ]]; then
           sed -i 's/^NUMPY_VERSION.*/NUMPY_VERSION ?= 1.26.4/' tensorflow/lite/tools/pip_package/Makefile
         else
@@ -49,13 +53,8 @@ jobs:
 
     - name: Build TFLite Runtime Wheel using Docker
       run: |
-        export BASE_IMAGE="ubuntu:22.04"
         export PYTHON_VERSION="${{ matrix.python_version }}"
-        if [[ "${{ matrix.python_version }}" == "3.12" ]]; then
-          export NUMPY_VERSION="1.26.4"
-        else
-          export NUMPY_VERSION="1.24.4"
-        fi
+        export NUMPY_VERSION="$( [[ "${{ matrix.python_version }}" == "3.12" ]] && echo "1.26.4" || echo "1.24.4" )"
         export TENSORFLOW_TARGET="${{ matrix.arch }}"
         export CUSTOM_BAZEL_FLAGS="--define=tflite_pip_with_xnnpack=true --define=tflite_pip_with_xnnpack_reshaping=true"
 
@@ -65,22 +64,24 @@ jobs:
     - name: Upload TFLite Wheel
       uses: actions/upload-artifact@v4
       with:
-        name: tflite_runtime-2.17.1-cp${{ matrix.python_version }}-cp${{ matrix.python_version }}-linux_${{ matrix.arch }}.whl
+        name: tflite_runtime-${{ env.TFLITE_VERSION }}-cp${{ matrix.python_version }}-cp${{ matrix.python_version }}-linux_${{ matrix.arch }}.whl
         path: tensorflow/lite/tools/pip_package/gen/tflite_pip/python/dist/*.whl
 
     - name: Create GitHub Release
       uses: softprops/action-gh-release@v1
       with:
-        tag_name: v2.17.1
-        name: "TensorFlow Lite Runtime 2.17.1 Release"
+        tag_name: v${{ env.TFLITE_VERSION }}
+        name: "TensorFlow Lite Runtime ${{ env.TFLITE_VERSION }} Release"
         body: |
           This release includes pre-built TensorFlow Lite runtime wheels for the following configurations:
-          - **TFLite Version:** 2.17.1
-          - **Architectures:** amd64, aarch64
-          - **Python Versions:** 3.9, 3.10, 3.11, 3.12
+          - **TFLite Version:** ${{ env.TFLITE_VERSION }}
+          - **Architectures:** ${{ join(matrix.arch, ', ') }}
+          - **Python Versions:** ${{ join(matrix.python_version, ', ') }}
           - **Custom Bazel Flags:**
             - `--define=tflite_pip_with_xnnpack=true`
             - `--define=tflite_pip_with_xnnpack_reshaping=true`
 
           These wheels are built with XNNPACK optimizations and reshaping support.
+          
+          **Inspired by:** [TFlite-builds](https://github.com/feranick/TFlite-builds/blob/main/README.md)
         files: tensorflow/lite/tools/pip_package/gen/tflite_pip/python/dist/*.whl
