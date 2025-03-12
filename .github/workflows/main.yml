@@ -67,6 +67,7 @@ jobs:
           CUSTOM_BAZEL_FLAGS+="$CUSTOM_BAZEL_FLAGS --copt=-mno-avx --copt=-mno-avx2 --copt=-msse4.2 --copt=-msse4.1 "
         fi
 
+        export CUSTOM_BAZEL_FLAGS
         BUILD_NUM_JOBS=$(nproc) CI_DOCKER_EXTRA_PARAMS="-e CUSTOM_BAZEL_FLAGS=$CUSTOM_BAZEL_FLAGS" \
           make -C tensorflow/lite/tools/pip_package docker-build \
           TENSORFLOW_TARGET=$TENSORFLOW_TARGET PYTHON_VERSION=$PYTHON_VERSION
@@ -78,7 +79,8 @@ jobs:
           echo "Error: No wheel file found!"
           exit 1
         fi
-        NEW_WHEEL_PATH="/home/runner/work/wheels/tflite_runtime-${{ env.TFLITE_VERSION }}${{ matrix.arch == 'x86_64-noavx' && '_noavx' || '' }}-cp${{ matrix.python_version }}-cp${{ matrix.python_version }}-linux_${{ matrix.arch == 'x86_64-noavx' && 'x86_64' || matrix.arch }}.whl"
+        echo "PY_TAG=$(echo ${{ matrix.python_version }} | sed 's/\\.//g')" >> $GITHUB_ENV
+        NEW_WHEEL_PATH="/home/runner/work/wheels/tflite_runtime-${{ env.TFLITE_VERSION }}${{ matrix.arch == 'x86_64-noavx' && '_noavx' || '' }}-cp${{ env.PY_TAG }}-cp${{ env.PY_TAG }}-linux_${{ matrix.arch == 'x86_64-noavx' && 'x86_64' || matrix.arch }}.whl"
         mv "$WHEEL_PATH" "$NEW_WHEEL_PATH"
         echo "Wheel created: $NEW_WHEEL_PATH"
 
@@ -91,7 +93,7 @@ jobs:
     - name: Upload Wheel Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: tflite_runtime-${{ env.TFLITE_VERSION }}${{ matrix.arch == 'x86_64-noavx' && '_noavx' || '' }}-cp${{ matrix.python_version }}-cp${{ matrix.python_version }}-linux_${{ matrix.arch == 'x86_64-noavx' && 'x86_64' || matrix.arch }}
+        name: tflite_runtime-${{ env.TFLITE_VERSION }}${{ matrix.arch == 'x86_64-noavx' && '_noavx' || '' }}-cp${{ env.PY_TAG }}-cp${{ env.PY_TAG }}-linux_${{ matrix.arch == 'x86_64-noavx' && 'x86_64' || matrix.arch }}
         path: /home/runner/work/wheels/*.whl
 
   release:
