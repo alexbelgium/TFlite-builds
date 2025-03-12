@@ -7,6 +7,7 @@ on:
 env:
   TFLITE_VERSION: "2.17.1"
   BASE_IMAGE: "ubuntu:22.04"
+  DEBIAN_FRONTEND: "noninteractive"
 
 jobs:
   build:
