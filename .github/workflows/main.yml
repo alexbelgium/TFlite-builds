@@ -63,15 +63,17 @@ jobs:
           make -C tensorflow/lite/tools/pip_package docker-build \
           TENSORFLOW_TARGET=$TENSORFLOW_TARGET PYTHON_VERSION=$PYTHON_VERSION
 
-           mkdir -p /home/runner/work/wheels
-           WHEEL_PATH=$(find tensorflow/lite/tools/pip_package/gen/tflite_pip/python3/dist -name "*.whl" | head -n 1)
-           if [[ -z "$WHEEL_PATH" ]]; then
-             echo "Error: No wheel file found!"
-             exit 1
-           fi
-           NEW_WHEEL_PATH="/home/runner/work/wheels/tflite_runtime-${{ env.tflite_version_name }}-cp${{ env.python_version_name }}-cp${{ env.python_version_name }}-linux_${{ env.arch_version_name }}.whl"
-           mv "$WHEEL_PATH" "$NEW_WHEEL_PATH"
-           echo "Wheel created: $NEW_WHEEL_PATH"
+    - name: Prepare Wheel for Upload
+      run: |
+        mkdir -p /home/runner/work/wheels
+        WHEEL_PATH=$(find tensorflow/lite/tools/pip_package/gen/tflite_pip/python${{ matrix.python_version }}/dist -name "*.whl" | head -n 1)
+        if [[ -z "$WHEEL_PATH" ]]; then
+          echo "Error: No wheel file found!"
+          exit 1
+        fi
+        NEW_WHEEL_PATH="/home/runner/work/wheels/tflite_runtime-${{ env.TFLITE_VERSION }}${{ matrix.arch == 'x86_64-noavx' && '_noavx' || '' }}-cp${{ matrix.python_version }}-cp${{ matrix.python_version }}-linux_${{ matrix.arch == 'x86_64-noavx' && 'x86_64' || matrix.arch }}.whl"
+        mv "$WHEEL_PATH" "$NEW_WHEEL_PATH"
+        echo "Wheel created: $NEW_WHEEL_PATH"
 
     - name: List Built Wheels
       run: ls -l /home/runner/work/wheels
@@ -82,7 +84,7 @@ jobs:
     - name: Upload Wheel Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: tflite_runtime-${{ env.tflite_version_name }}-cp${{ env.python_version_name }}-cp${{ env.python_version_name }}-linux_${{ env.arch_version_name }}
+        name: tflite_runtime-${{ env.TFLITE_VERSION }}${{ matrix.arch == 'x86_64-noavx' && '_noavx' || '' }}-cp${{ matrix.python_version }}-cp${{ matrix.python_version }}-linux_${{ matrix.arch == 'x86_64-noavx' && 'x86_64' || matrix.arch }}
         path: /home/runner/work/wheels/*.whl
 
   release:
@@ -116,14 +118,14 @@ jobs:
               --title "tflite_runtime ${{ env.TFLITE_VERSION }}" \
               --notes "This release includes pre-built TensorFlow Lite runtime wheels for the following configurations:
           - **TFLite Version:** ${{ env.TFLITE_VERSION }}
-          - **Architectures:** ${{ join(matrix.arch, ', ') }}
-          - **Python Versions:** ${{ join(matrix.python_version, ', ') }}
+          - **Architectures:** x86_64, x86_64-noavx, aarch64
+          - **Python Versions:** 3.9, 3.10, 3.11
           - **Custom Bazel Flags:**
             - `--define=tflite_pip_with_xnnpack=true`
             - `--define=tflite_pip_with_xnnpack_reshaping=true`
-          
+          
           These wheels are built with XNNPACK optimizations and reshaping support.
-          
+          
           **Inspired by:** [TFlite-builds](https://github.com/feranick/TFlite-builds/blob/main/README.md)"
           fi
         env:
@@ -131,6 +133,6 @@ jobs:
 
       - name: Upload Wheels to GitHub Release
         run: |
-          gh release upload v${{ env.TFLITE_VERSION }} wheels/**/*.whl --clobber -R "${{ github.repository }}"
+          gh release upload v${{ env.TFLITE_VERSION }} wheels/*.whl --clobber -R "${{ github.repository }}"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
