@@ -1,8 +1,8 @@
 name: Build TFLite Runtime Wheels
 
 on:
-  push:
   workflow_dispatch:
+  push:
 
 jobs:
   build:
@@ -25,8 +25,11 @@ jobs:
       run: |
         sudo apt update
         sudo apt remove -y docker.io containerd runc || true
-        sudo apt install -y build-essential lld git zip unzip pkg-config curl gcc-12 clang-17
+        sudo apt install -y build-essential lld git zip unzip pkg-config curl gcc-12
         curl -fsSL https://get.docker.com | sudo sh
+        wget -qO- https://apt.llvm.org/llvm.sh | sudo bash -s -- 17
+        sudo ln -sf /usr/bin/clang-17 /usr/bin/clang
+        echo "Clang version is $(clang-17 --version)"
 
     - name: Adjust Dockerfile
       run: |
