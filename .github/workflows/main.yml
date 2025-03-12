@@ -1,0 +1,54 @@
+name: Build TFLite Runtime Wheels
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    strategy:
+      matrix:
+        python_version: ["3.9", "3.10", "3.11"]
+        arch: ["amd64", "aarch64"]
+
+    steps:
+    - name: Checkout TensorFlow
+      uses: actions/checkout@v4
+      with:
+        repository: tensorflow/tensorflow
+        submodules: true
+        fetch-depth: 1
+
+    - name: Setup Dependencies
+      run: |
+        sudo apt update
+        sudo apt install -y swig libjpeg-dev zlib1g-dev python${{ matrix.python_version }}-dev python${{ matrix.python_version }}-venv python${{ matrix.python_version }}-distutils python3-pip
+        python${{ matrix.python_version }} -m pip install numpy pybind11
+
+    - name: Build TFLite Runtime Wheel
+      env:
+        CUSTOM_BAZEL_FLAGS: "--define=tflite_pip_with_flex=true"
+      run: |
+        PYTHON_VERSION=${{ matrix.python_version }}
+        PYTHON_VERSION_NODOT=$(echo $PYTHON_VERSION | sed 's/\.//')
+        ARCH=${{ matrix.arch }}
+
+        if [ "$ARCH" = "amd64" ]; then
+          TARGET="native"
+          CI_TARGET="CPU"
+        elif [ "$ARCH" = "aarch64" ]; then
+          TARGET="aarch64"
+          CI_TARGET="PI-PYTHON${PYTHON_VERSION_NODOT}"
+        else
+          echo "Unsupported architecture $ARCH"
+          exit 1
+        fi
+
+        tensorflow/tools/ci_build/ci_build.sh $CI_TARGET \
+          tensorflow/lite/tools/pip_package/build_pip_package_with_bazel.sh $TARGET
+
+    - name: Upload TFLite Wheel
+      uses: actions/upload-artifact@v4
+      with:
+        name: tflite_runtime-${{ matrix.arch }}-py${{ matrix.python_version }}
+        path: tensorflow/lite/tools/pip_package/gen/tflite_pip/python/dist/*.whl
