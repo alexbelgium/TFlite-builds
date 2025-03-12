@@ -62,7 +62,6 @@ jobs:
         BUILD_NUM_JOBS=$(nproc) CI_DOCKER_EXTRA_PARAMS="-e CUSTOM_BAZEL_FLAGS=$CUSTOM_BAZEL_FLAGS" \
           make -C tensorflow/lite/tools/pip_package docker-build \
           TENSORFLOW_TARGET=$TENSORFLOW_TARGET PYTHON_VERSION=$PYTHON_VERSION
-
     - name: Prepare Wheel for Upload
       run: |
         mkdir -p /home/runner/work/wheels
@@ -118,14 +117,14 @@ jobs:
               --title "tflite_runtime ${{ env.TFLITE_VERSION }}" \
               --notes "This release includes pre-built TensorFlow Lite runtime wheels for the following configurations:
           - **TFLite Version:** ${{ env.TFLITE_VERSION }}
-          - **Architectures:** x86_64, x86_64-noavx, aarch64
-          - **Python Versions:** 3.9, 3.10, 3.11
+          - **Architectures:** ${{ join(matrix.arch, ', ') }}
+          - **Python Versions:** ${{ join(matrix.python_version, ', ') }}
           - **Custom Bazel Flags:**
             - `--define=tflite_pip_with_xnnpack=true`
             - `--define=tflite_pip_with_xnnpack_reshaping=true`
-          
+          
           These wheels are built with XNNPACK optimizations and reshaping support.
-          
+          
           **Inspired by:** [TFlite-builds](https://github.com/feranick/TFlite-builds/blob/main/README.md)"
           fi
         env:
@@ -133,6 +132,6 @@ jobs:
 
       - name: Upload Wheels to GitHub Release
         run: |
-          gh release upload v${{ env.TFLITE_VERSION }} wheels/*.whl --clobber -R "${{ github.repository }}"
+          gh release upload v${{ env.TFLITE_VERSION }} wheels/**/*.whl --clobber -R "${{ github.repository }}"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
