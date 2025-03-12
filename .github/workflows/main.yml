@@ -67,10 +67,19 @@ jobs:
           CUSTOM_BAZEL_FLAGS+="$CUSTOM_BAZEL_FLAGS --copt=-mno-avx --copt=-mno-avx2 --copt=-msse4.2 --copt=-msse4.1 "
         fi
 
+        if [[ "${{ matrix.arch }}" == "aarch64" ]]; then
+          TARGET_ARCH="aarch64"
+          PYTHON_ENV="PI-PYTHON${PYTHON_VERSION//./}" # e.g. "PI-PYTHON311"
+        else
+          TARGET_ARCH="native"
+          PYTHON_ENV="PI-PYTHON${PYTHON_VERSION//./}"
+        fi
+
         export CUSTOM_BAZEL_FLAGS
-        BUILD_NUM_JOBS=$(nproc) CI_DOCKER_EXTRA_PARAMS="-e CUSTOM_BAZEL_FLAGS=$CUSTOM_BAZEL_FLAGS" \
-          make -C tensorflow/lite/tools/pip_package docker-build \
-          TENSORFLOW_TARGET=$TENSORFLOW_TARGET PYTHON_VERSION=$PYTHON_VERSION
+        CI_DOCKER_EXTRA_PARAMS="-e CUSTOM_BAZEL_FLAGS=$CUSTOM_BAZEL_FLAGS" \
+          tensorflow/tools/ci_build/ci_build.sh $PYTHON_ENV \
+          tensorflow/lite/tools/pip_package/build_pip_package_with_bazel.sh $TARGET_ARCH
+          
     - name: Prepare Wheel for Upload
       run: |
         mkdir -p /home/runner/work/wheels
@@ -119,26 +128,19 @@ jobs:
 
       - name: Create GitHub Release (if not exists)
         run: |
-          if gh release view v${{ env.TFLITE_VERSION }} -R "${{ github.repository }}" > /dev/null 2>&1; then
+          if gh release view ${{ env.TFLITE_VERSION }}2 -R "${{ github.repository }}" > /dev/null 2>&1; then
             echo "Release already exists. Skipping creation."
           else
-            gh release create v${{ env.TFLITE_VERSION }} \
+            gh release create ${{ env.TFLITE_VERSION }}2 \
               -R "${{ github.repository }}" \
               --title "tflite_runtime ${{ env.TFLITE_VERSION }}" \
-              --notes "This release includes pre-built TensorFlow Lite runtime wheels for the following configurations:
-          - **TFLite Version:** ${{ env.TFLITE_VERSION }}
-          - **Architectures:** ${{ join(matrix.arch, ', ') }}
-          - **Python Versions:** ${{ join(matrix.python_version, ', ') }}
-          
-          These wheels are built with XNNPACK optimizations and reshaping support.
-          
-          **Inspired by:** [TFlite-builds](https://github.com/feranick/TFlite-builds/blob/main/README.md)"
+              --notes "Automated build for tflite_runtime ${{ env.TFLITE_VERSION }}"
           fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload Wheels to GitHub Release
         run: |
-          gh release upload v${{ env.TFLITE_VERSION }} wheels/**/*.whl --clobber -R "${{ github.repository }}"
+          gh release upload ${{ env.TFLITE_VERSION }} wheels/**/*.whl --clobber -R "${{ github.repository }}"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
