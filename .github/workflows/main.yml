@@ -59,8 +59,9 @@ jobs:
           CUSTOM_BAZEL_FLAGS="$CUSTOM_BAZEL_FLAGS --copt=-mno-avx --copt=-mno-avx2 --copt=-msse4.2 --copt=-msse4.1"
         fi
 
-        BUILD_NUM_JOBS=$(nproc) make -C tensorflow/lite/tools/pip_package docker-build \
-          TENSORFLOW_TARGET=$TENSORFLOW_TARGET PYTHON_VERSION=$PYTHON_VERSION CUSTOM_BAZEL_FLAGS="$CUSTOM_BAZEL_FLAGS"
+        BUILD_NUM_JOBS=$(nproc) CI_DOCKER_EXTRA_PARAMS="-e CUSTOM_BAZEL_FLAGS=$CUSTOM_BAZEL_FLAGS" \
+          make -C tensorflow/lite/tools/pip_package docker-build \
+          TENSORFLOW_TARGET=$TENSORFLOW_TARGET PYTHON_VERSION=$PYTHON_VERSION
 
            mkdir -p /home/runner/work/wheels
            WHEEL_PATH=$(find tensorflow/lite/tools/pip_package/gen/tflite_pip/python3/dist -name "*.whl" | head -n 1)
