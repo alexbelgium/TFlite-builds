@@ -99,6 +99,8 @@ jobs:
 
         export CUSTOM_BAZEL_FLAGS
         export TF_PYTHON_VERSION="${{ matrix.python_version }}"
+        export CC=clang-17
+        export CXX=clang++-17
         ./tensorflow/lite/tools/pip_package/build_pip_package_with_bazel.sh
         
         #CI_DOCKER_EXTRA_PARAMS="-e CUSTOM_BAZEL_FLAGS=$CUSTOM_BAZEL_FLAGS" \
