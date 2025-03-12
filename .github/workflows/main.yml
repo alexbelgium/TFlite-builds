@@ -19,10 +19,12 @@ jobs:
         submodules: true
         fetch-depth: 1
 
-    - name: Setup Dependencies
+    - name: Setup Python from Deadsnakes PPA
       run: |
+        sudo add-apt-repository ppa:deadsnakes/ppa -y
         sudo apt update
-        sudo apt install -y swig libjpeg-dev zlib1g-dev python${{ matrix.python_version }}-dev python${{ matrix.python_version }}-venv python${{ matrix.python_version }}-distutils python3-pip
+        sudo apt install -y python${{ matrix.python_version }} python${{ matrix.python_version }}-dev python${{ matrix.python_version }}-venv python${{ matrix.python_version }}-distutils
+        python${{ matrix.python_version }} -m pip install --upgrade pip
         python${{ matrix.python_version }} -m pip install numpy pybind11
 
     - name: Build TFLite Runtime Wheel
