@@ -19,7 +19,7 @@ jobs:
         repository: tensorflow/tensorflow
         submodules: true
         fetch-depth: 0
-        ref: v2.18.0
+        ref: v2.17.1
 
     - name: Setup Docker and Dependencies
       run: |
@@ -57,12 +57,30 @@ jobs:
           export NUMPY_VERSION="1.24.4"
         fi
         export TENSORFLOW_TARGET="${{ matrix.arch }}"
+        export CUSTOM_BAZEL_FLAGS="--define=tflite_pip_with_xnnpack=true --define=tflite_pip_with_xnnpack_reshaping=true"
 
         BUILD_NUM_JOBS=$(nproc) make -C tensorflow/lite/tools/pip_package docker-build \
-          TENSORFLOW_TARGET=$TENSORFLOW_TARGET PYTHON_VERSION=$PYTHON_VERSION
+          TENSORFLOW_TARGET=$TENSORFLOW_TARGET PYTHON_VERSION=$PYTHON_VERSION CUSTOM_BAZEL_FLAGS="$CUSTOM_BAZEL_FLAGS"
 
     - name: Upload TFLite Wheel
       uses: actions/upload-artifact@v4
       with:
-        name: tflite_runtime-${{ matrix.arch }}-py${{ matrix.python_version }}
+        name: tflite_runtime-2.17.1-cp${{ matrix.python_version }}-cp${{ matrix.python_version }}-linux_${{ matrix.arch }}.whl
         path: tensorflow/lite/tools/pip_package/gen/tflite_pip/python/dist/*.whl
+
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: v2.17.1
+        name: "TensorFlow Lite Runtime 2.17.1 Release"
+        body: |
+          This release includes pre-built TensorFlow Lite runtime wheels for the following configurations:
+          - **TFLite Version:** 2.17.1
+          - **Architectures:** amd64, aarch64
+          - **Python Versions:** 3.9, 3.10, 3.11, 3.12
+          - **Custom Bazel Flags:**
+            - `--define=tflite_pip_with_xnnpack=true`
+            - `--define=tflite_pip_with_xnnpack_reshaping=true`
+
+          These wheels are built with XNNPACK optimizations and reshaping support.
+        files: tensorflow/lite/tools/pip_package/gen/tflite_pip/python/dist/*.whl
