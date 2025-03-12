@@ -23,7 +23,7 @@ jobs:
     - name: Setup Docker and Dependencies
       run: |
         sudo apt update
-        sudo apt install -y docker.io build-essential lld git zip unzip pkg-config curl gcc-12 clang-17
+        sudo apt install -y docker.io build-essential lld git zip unzip pkg-config curl gcc-12 gcc++-12
 
     - name: Adjust Dockerfile
       run: |
