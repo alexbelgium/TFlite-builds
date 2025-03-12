@@ -8,7 +8,7 @@ jobs:
     runs-on: ubuntu-22.04
     strategy:
       matrix:
-        python_version: ["3.9", "3.10", "3.11"]
+        python_version: ["3.9", "3.10", "3.11", "3.12"]
         arch: ["amd64", "aarch64"]
 
     steps:
@@ -20,13 +20,18 @@ jobs:
         fetch-depth: 0
         ref: v2.18.0
 
-    - name: Setup Docker
+    - name: Setup Docker and Dependencies
       run: |
         sudo apt update
-        sudo apt install -y docker.io
+        sudo apt install -y docker.io software-properties-common
+        sudo add-apt-repository ppa:deadsnakes/ppa -y
+        sudo apt-get update
+        sudo apt-get install -y \
+          python${{ matrix.python_version }} build-essential lld git zip unzip pkg-config curl \
+          python${{ matrix.python_version }}-dev python${{ matrix.python_version }}-venv gcc-12 clang-17
 
-    - name: Adjust Dockerfile for Python 3.11
-      if: matrix.python_version == '3.11'
+    - name: Adjust Dockerfile for Python >= 3.11
+      if: matrix.python_version == '3.11' || matrix.python_version == '3.12'
       run: |
         sed -i '/get-pip.py/a RUN rm /usr/lib/python${PYTHON_VERSION}/EXTERNALLY-MANAGED' tensorflow/lite/tools/pip_package/Dockerfile.py3
 
