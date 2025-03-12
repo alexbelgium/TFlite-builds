@@ -17,37 +17,28 @@ jobs:
       with:
         repository: tensorflow/tensorflow
         submodules: true
-        fetch-depth: 1
+        fetch-depth: 0
+        ref: v2.18.0
 
-    - name: Setup Python from Deadsnakes PPA
+    - name: Setup Docker
       run: |
-        sudo add-apt-repository ppa:deadsnakes/ppa -y
         sudo apt update
-        sudo apt install -y python${{ matrix.python_version }} python${{ matrix.python_version }}-dev python${{ matrix.python_version }}-venv python${{ matrix.python_version }}-distutils
-        python${{ matrix.python_version }} -m pip install --upgrade pip
-        python${{ matrix.python_version }} -m pip install numpy pybind11
+        sudo apt install -y docker.io
 
-    - name: Build TFLite Runtime Wheel
-      env:
-        CUSTOM_BAZEL_FLAGS: "--define=tflite_pip_with_flex=true"
+    - name: Adjust Dockerfile for Python 3.11
+      if: matrix.python_version == '3.11'
       run: |
-        PYTHON_VERSION=${{ matrix.python_version }}
-        PYTHON_VERSION_NODOT=$(echo $PYTHON_VERSION | sed 's/\.//')
-        ARCH=${{ matrix.arch }}
+        sed -i '/get-pip.py/a RUN rm /usr/lib/python${PYTHON_VERSION}/EXTERNALLY-MANAGED' tensorflow/lite/tools/pip_package/Dockerfile.py3
 
-        if [ "$ARCH" = "amd64" ]; then
-          TARGET="native"
-          CI_TARGET="CPU"
-        elif [ "$ARCH" = "aarch64" ]; then
-          TARGET="aarch64"
-          CI_TARGET="PI-PYTHON${PYTHON_VERSION_NODOT}"
-        else
-          echo "Unsupported architecture $ARCH"
-          exit 1
-        fi
+    - name: Configure Makefile
+      run: |
+        sed -i 's/^BASE_IMAGE.*/BASE_IMAGE ?= ubuntu:22.04/' tensorflow/lite/tools/pip_package/Makefile
+        sed -i 's/^PYTHON_VERSION.*/PYTHON_VERSION ?= ${{ matrix.python_version }}/' tensorflow/lite/tools/pip_package/Makefile
+        sed -i 's/^NUMPY_VERSION.*/NUMPY_VERSION ?= 1.24.4/' tensorflow/lite/tools/pip_package/Makefile
 
-        tensorflow/tools/ci_build/ci_build.sh $CI_TARGET \
-          tensorflow/lite/tools/pip_package/build_pip_package_with_bazel.sh $TARGET
+    - name: Build TFLite Runtime Wheel using Docker
+      run: |
+        BUILD_NUM_JOBS=$(nproc) make -C tensorflow/lite/tools/pip_package docker-build TENSORFLOW_TARGET=${{ matrix.arch }} PYTHON_VERSION=${{ matrix.python_version }}
 
     - name: Upload TFLite Wheel
       uses: actions/upload-artifact@v4
