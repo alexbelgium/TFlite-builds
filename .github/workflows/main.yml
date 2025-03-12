@@ -62,11 +62,27 @@ jobs:
         BUILD_NUM_JOBS=$(nproc) make -C tensorflow/lite/tools/pip_package docker-build \
           TENSORFLOW_TARGET=$TENSORFLOW_TARGET PYTHON_VERSION=$PYTHON_VERSION CUSTOM_BAZEL_FLAGS="$CUSTOM_BAZEL_FLAGS"
 
-    - name: Upload TFLite Wheel
+           mkdir -p /home/runner/work/wheels
+           WHEEL_PATH=$(find tensorflow/lite/tools/pip_package/gen/tflite_pip/python3/dist -name "*.whl" | head -n 1)
+           if [[ -z "$WHEEL_PATH" ]]; then
+             echo "Error: No wheel file found!"
+             exit 1
+           fi
+           NEW_WHEEL_PATH="/home/runner/work/wheels/tflite_runtime-${{ env.tflite_version_name }}-cp${{ env.python_version_name }}-cp${{ env.python_version_name }}-linux_${{ env.arch_version_name }}.whl"
+           mv "$WHEEL_PATH" "$NEW_WHEEL_PATH"
+           echo "Wheel created: $NEW_WHEEL_PATH"
+
+    - name: List Built Wheels
+      run: ls -l /home/runner/work/wheels
+
+    - name: Verify Wheel Architectures
+      run: file /home/runner/work/wheels/*.whl
+
+    - name: Upload Wheel Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: tflite_runtime-${{ env.TFLITE_VERSION }}${{ matrix.arch == 'x86_64-noavx' && '_noavx' || '' }}-cp${{ matrix.python_version }}-cp${{ matrix.python_version }}-linux_${{ matrix.arch == 'x86_64-noavx' && 'x86_64' || matrix.arch }}.whl
-        path: tensorflow/tensorflow/lite/tools/pip_package/gen/tflite_pip/python${{ matrix.python_version }}/dist/*.whl
+        name: tflite_runtime-${{ env.tflite_version_name }}-cp${{ env.python_version_name }}-cp${{ env.python_version_name }}-linux_${{ env.arch_version_name }}
+        path: /home/runner/work/wheels/*.whl
 
   release:
     runs-on: ubuntu-latest
