@@ -129,9 +129,6 @@ jobs:
           - **TFLite Version:** ${{ env.TFLITE_VERSION }}
           - **Architectures:** ${{ join(matrix.arch, ', ') }}
           - **Python Versions:** ${{ join(matrix.python_version, ', ') }}
-          - **Custom Bazel Flags:**
-            - `--define=tflite_pip_with_xnnpack=true`
-            - `--define=tflite_pip_with_xnnpack_reshaping=true`
           
           These wheels are built with XNNPACK optimizations and reshaping support.
           
