@@ -22,6 +22,7 @@ jobs:
 
     - name: Setup Docker and Dependencies
       run: |
+        sudo apt-get remove -y containerd
         sudo apt update
         sudo apt install -y docker.io software-properties-common
         sudo add-apt-repository ppa:deadsnakes/ppa -y
