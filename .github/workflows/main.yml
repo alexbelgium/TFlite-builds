@@ -84,7 +84,7 @@ jobs:
         # Reduce size
         CUSTOM_BAZEL_FLAGS+="--define=no_tensorflow_py_deps=true --strip=always "
         # Fix build issues
-        CUSTOM_BAZEL_FLAGS+="--spawn_strategy=sandboxed "
+        CUSTOM_BAZEL_FLAGS+="--copt=-Wno-gnu-offsetof-extensions --features=-layering_check "
 
         # Remove avx
         if [[ "${{ matrix.arch }}" == "x86_64-noavx" ]]; then
