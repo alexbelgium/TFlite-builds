@@ -73,7 +73,7 @@ jobs:
           sudo apt-get install -y \
             python${{ matrix.python_version }} build-essential lld git zip unzip pkg-config curl \
             python${{ matrix.python_version }}-dev python${{ matrix.python_version }}-venv \
-            python-is-python3 python${{ matrix.python_version }}-launchpadlib python${{ matrix.python_version }}-pip
+            python-is-python3
             # gcc-12 g++-12 libicu70
 
           # ========== 2) Create and Activate Python Virtual Env ==========
