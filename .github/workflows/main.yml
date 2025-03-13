@@ -22,12 +22,13 @@ jobs:
     steps:
     - name: Set up basic tools
       run: |
+        export DEBIAN_FRONTEND=noninteractive
         apt-get update
         # Recommended to install locales if you see locale issues
         apt-get install -y locales
         # Choose your locale
-        locale-gen en_US.UTF-8
-        update-locale LANG=en_US.UTF-8
+        #locale-gen en_US.UTF-8
+        #update-locale LANG=en_US.UTF-8
 
         # Core packages
         apt-get install -y \
@@ -91,11 +92,12 @@ jobs:
         # If building for x86_64 with no AVX
         if [[ "${{ matrix.arch }}" == "x86_64" ]]; then
           CUSTOM_BAZEL_FLAGS+="--copt=-mno-avx --copt=-mno-avx2 --copt=-msse4.2 --copt=-msse4.1 "
+          CUSTOM_BAZEL_FLAGS+="--copt=-Wno-gnu-offsetof-extensions "
         fi
         # Speed and size
         CUSTOM_BAZEL_FLAGS+="--define xnnpack_force_float_precision=fp16 "
         CUSTOM_BAZEL_FLAGS+="--define=no_tensorflow_py_deps=true --strip=always "
-        CUSTOM_BAZEL_FLAGS+="--copt=-Wno-gnu-offsetof-extensions --features=-layering_check "
+        CUSTOM_BAZEL_FLAGS+="--features=-layering_check "
 
         export CUSTOM_BAZEL_FLAGS
         export TF_PYTHON_VERSION="${PYTHON_VERSION}"
