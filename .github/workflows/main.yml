@@ -38,6 +38,7 @@ jobs:
 
     - name: TRY PINTO
       run: |
+        set -eux
         rm -r tensorflow
         BRANCH=r2.15-tflite-build
         git clone -b ${BRANCH} --depth 1 https://github.com/PINTO0309/tensorflow.git
