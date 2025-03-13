@@ -81,6 +81,8 @@ jobs:
         CUSTOM_BAZEL_FLAGS+="--define=tflite_pip_with_xnnpack=true --define=tflite_pip_with_xnnpack_reshaping=true "
         # Add flex
         CUSTOM_BAZEL_FLAGS+="--define=tflite_pip_with_flex=true "
+        # Increase speed
+        CUSTOM_BAZEL_FLAGS+="--define xnnpack_force_float_precision=fp16 "
         # Reduce size
         CUSTOM_BAZEL_FLAGS+="--define=no_tensorflow_py_deps=true --strip=always "
         # Fix build issues
