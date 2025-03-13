@@ -90,7 +90,7 @@ jobs:
         export CXX=clang++-17
         sed -i "/^bazel/i\bazel clean --expunge" tensorflow/lite/tools/pip_package/build_pip_package_with_bazel.sh
         ./tensorflow/lite/tools/pip_package/build_pip_package_with_bazel.sh
-        
+        
         #CI_DOCKER_EXTRA_PARAMS="-e CUSTOM_BAZEL_FLAGS=$CUSTOM_BAZEL_FLAGS" \
         #  tensorflow/tools/ci_build/ci_build.sh $PYTHON_ENV \
         #  tensorflow/lite/tools/pip_package/build_pip_package_with_bazel.sh $TARGET_ARCH
