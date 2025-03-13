@@ -83,6 +83,8 @@ jobs:
         CUSTOM_BAZEL_FLAGS+="--define=tflite_pip_with_flex=true "
         # Reduce size
         CUSTOM_BAZEL_FLAGS+="--define=no_tensorflow_py_deps=true --strip=always "
+        # Fix build issues
+        +="--spawn_strategy=sandboxed "
 
         # Remove avx
         if [[ "${{ matrix.arch }}" == "x86_64-noavx" ]]; then
@@ -101,6 +103,7 @@ jobs:
         export TF_PYTHON_VERSION="${{ matrix.python_version }}"
         export CC=clang-17
         export CXX=clang++-17
+        bazel clean --expunge
         ./tensorflow/lite/tools/pip_package/build_pip_package_with_bazel.sh
         
         #CI_DOCKER_EXTRA_PARAMS="-e CUSTOM_BAZEL_FLAGS=$CUSTOM_BAZEL_FLAGS" \
