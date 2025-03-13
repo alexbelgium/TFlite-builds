@@ -10,32 +10,102 @@ env:
 
 jobs:
   build:
-    runs-on: ubuntu-noble
+    runs-on: ubuntu-22.04
     strategy:
       matrix:
         python_version: ["3.11"]
         arch: ["x86_64"]
 
     steps:
+    - name: Checkout TensorFlow
+      uses: actions/checkout@v4
+      with:
+        repository: tensorflow/tensorflow
+        submodules: true
+        fetch-depth: 0
+        ref: v${{ env.TFLITE_VERSION }}
+
     - name: Setup Docker and Dependencies
       run: |
         sudo apt update
         #sudo apt remove -y docker.io containerd runc || true
         sudo apt remove -y llvm*
-        sudo apt install -y build-essential lld git zip unzip pkg-config curl gcc-12
+        sudo apt install -y build-essential lld git zip unzip pkg-config curl gcc-12 wget
         #curl -fsSL https://get.docker.com | sudo sh
         wget -qO- https://apt.llvm.org/llvm.sh | sudo bash -s -- 17
         sudo ln -sf /usr/bin/clang-17 /usr/bin/clang
         echo "Clang version is $(clang-17 --version)"
 
-    - name: Setup Docker and Dependencies
+    - name: Adjust Dockerfile
       run: |
-        BRANCH=r2.16-tflite-build
-        git clone -b ${BRANCH} --depth 1 https://github.com/PINTO0309/tensorflow.git
-        cd tensorflow/lite/tools/pip_package
+        exit 0
+        sed -i 's/3.16.8/3.29.6/g' tensorflow/lite/tools/pip_package/Dockerfile.py3
+        if [[ "${{ matrix.python_version }}" == "3.11" ]]; then
+          sed -i '/RUN curl -OL https:\/\/bootstrap.pypa.io\/get-pip.py/a\    RUN rm -f /usr/lib/python${{ matrix.python_version }}/EXTERNALLY-MANAGED' tensorflow/lite/tools/pip_package/Dockerfile.py3
+        fi
+        sed -i '/python$PYTHON_VERSION-distutils/d' tensorflow/lite/tools/pip_package/Dockerfile.py3
+        sed -i "/FROM/a\ENV DEBIAN_FRONTEND=noninteractive" tensorflow/lite/tools/pip_package/Dockerfile.py3
+        sed -i "/Install Python packages/a\RUN echo 'debconf debconf/frontend select Noninteractive' | debconf-set-selections" tensorflow/lite/tools/pip_package/Dockerfile.py3
+
+    - name: Configure Makefile
+      run: |
+        exit 0
+        sed -i 's/ubuntu:20.04/${{ env.BASE_IMAGE }}/g' tensorflow/lite/tools/pip_package/Makefile
+        sed -i 's/^NUMPY_VERSION.*/NUMPY_VERSION ?= 1.24.4/' tensorflow/lite/tools/pip_package/Makefile
+
+    - name: Install dependencies
+      run: |
+        set -x
+
+          echo "Building TFLite Runtime for ${{ matrix.arch }} / Python ${{ matrix.python }}"
+
+          # ========== 1) Install System Dependencies ==========
+          sudo add-apt-repository ppa:deadsnakes/ppa
+          sudo apt-get update
+          sudo apt-get install -y \
+            python${{ matrix.python_version }} build-essential lld git zip unzip pkg-config curl \
+            python${{ matrix.python_version }}-dev python${{ matrix.python_version }}-venv
+          # gcc-12 g++-12 libicu70
+
+          # ========== 2) Create and Activate Python Virtual Env ==========
+          python${{ matrix.python }} -m venv /tmp/tflite_env
+          source /tmp/tflite_env/bin/activate
+          pip install --upgrade pip wheel numpy==1.26.4 auditwheel setuptools
+
+    - name: Build TFLite Runtime Wheel using Docker
+      run: |
+        export PYTHON_VERSION="${{ matrix.python_version }}"
+        export NUMPY_VERSION="1.24.4"
+        export TENSORFLOW_TARGET="${{ matrix.arch }}"
+        # Add xnnpack
+        CUSTOM_BAZEL_FLAGS+="--define=tflite_pip_with_xnnpack=true --define=tflite_pip_with_xnnpack_reshaping=true "
+        # Add flex
+        CUSTOM_BAZEL_FLAGS+="--define=tflite_pip_with_flex=true "
+        # Reduce size
+        CUSTOM_BAZEL_FLAGS+="--define=no_tensorflow_py_deps=true --strip=always "
+
+        # Remove avx
+        if [[ "${{ matrix.arch }}" == "x86_64-noavx" ]]; then
+          CUSTOM_BAZEL_FLAGS+="$CUSTOM_BAZEL_FLAGS --copt=-mno-avx --copt=-mno-avx2 --copt=-msse4.2 --copt=-msse4.1 "
+        fi
+
+        if [[ "${{ matrix.arch }}" == "aarch64" ]]; then
+          TARGET_ARCH="aarch64"
+          PYTHON_ENV="PI-PYTHON${PYTHON_VERSION//./}" # e.g. "PI-PYTHON311"
+        else
+          TARGET_ARCH="native"
+          PYTHON_ENV="PI-PYTHON${PYTHON_VERSION//./}"
+        fi
+
+        export CUSTOM_BAZEL_FLAGS
+        export TF_PYTHON_VERSION="${{ matrix.python_version }}"
+        export CC=clang-17
+        export CXX=clang++-17
+        ./tensorflow/lite/tools/pip_package/build_pip_package_with_bazel.sh
         
-        make BASE_IMAGE=debian:bookworm PYTHON=python3 PYTHON_VERSION=3.11 TENSORFLOW_TARGET=aarch64 docker-build
-        make BASE_IMAGE=debian:bookworm PYTHON=python3 PYTHON_VERSION=3.11 TENSORFLOW_TARGET=native docker-build
+        #CI_DOCKER_EXTRA_PARAMS="-e CUSTOM_BAZEL_FLAGS=$CUSTOM_BAZEL_FLAGS" \
+        #  tensorflow/tools/ci_build/ci_build.sh $PYTHON_ENV \
+        #  tensorflow/lite/tools/pip_package/build_pip_package_with_bazel.sh $TARGET_ARCH
           
     - name: Prepare Wheel for Upload
       run: |
