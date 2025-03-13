@@ -81,6 +81,8 @@ jobs:
         CUSTOM_BAZEL_FLAGS+="--define=tflite_pip_with_xnnpack=true --define=tflite_pip_with_xnnpack_reshaping=true "
         # Add flex
         CUSTOM_BAZEL_FLAGS+="--define=tflite_pip_with_flex=true "
+        # Remove avx
+        CUSTOM_BAZEL_FLAGS+="--copt=-mno-avx --copt=-mno-avx2 --copt=-msse4.2 --copt=-msse4.1 "
         # Increase speed
         CUSTOM_BAZEL_FLAGS+="--define xnnpack_force_float_precision=fp16 "
         # Reduce size
