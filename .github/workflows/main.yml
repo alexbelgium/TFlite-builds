@@ -64,8 +64,9 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y \
             python${{ matrix.python_version }} build-essential lld git zip unzip pkg-config curl \
-            python${{ matrix.python_version }}-dev python${{ matrix.python_version }}-venv
-          # gcc-12 g++-12 libicu70
+            python${{ matrix.python_version }}-dev python${{ matrix.python_version }}-venv \
+            python-is-python3 python${{ matrix.python_version }}-launchpadlib python${{ matrix.python_version }}-pip
+            # gcc-12 g++-12 libicu70
 
           # ========== 2) Create and Activate Python Virtual Env ==========
           python${{ matrix.python }} -m venv /tmp/tflite_env
