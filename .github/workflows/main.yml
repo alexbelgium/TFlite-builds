@@ -127,7 +127,7 @@ jobs:
     - name: Prepare Wheel for Upload
       run: |
         mkdir -p /home/runner/work/wheels
-        WHEEL_PATH=$(find tensorflow/lite/tools/pip_package/gen/tflite_pip/python${{ matrix.python_version }}/dist -name "*.whl" | head -n 1)
+        WHEEL_PATH=$(find tensorflow/lite/tools/pip_package/gen/tflite_pip/python3/dist -name "*.whl" | head -n 1)
         if [[ -z "$WHEEL_PATH" ]]; then
           echo "Error: No wheel file found!"
           exit 1
