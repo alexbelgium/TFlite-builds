@@ -10,7 +10,7 @@ env:
 
 jobs:
   build:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-noble
     strategy:
       matrix:
         python_version: ["3.11"]
@@ -101,6 +101,7 @@ jobs:
         export TF_PYTHON_VERSION="${{ matrix.python_version }}"
         export CC=clang-17
         export CXX=clang++-17
+        bazel clean --expunge || true
         ./tensorflow/lite/tools/pip_package/build_pip_package_with_bazel.sh
         
         #CI_DOCKER_EXTRA_PARAMS="-e CUSTOM_BAZEL_FLAGS=$CUSTOM_BAZEL_FLAGS" \
