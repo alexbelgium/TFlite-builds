@@ -1,4 +1,4 @@
-name: Build TFLite Runtime Wheels
+name: Build TFLite Runtime Wheels on Debian Bookworm
 
 on:
   workflow_dispatch:
@@ -6,95 +6,106 @@ on:
 
 env:
   TFLITE_VERSION: "2.17.1"
-  BASE_IMAGE: "ubuntu:22.04"
 
 jobs:
   build:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
+    # Run inside a Debian Bookworm container
+    container:
+      image: debian:bookworm
+
     strategy:
       matrix:
         python_version: ["3.11"]
-        arch: ["aarch64"]
+        arch: ["x86_64"]
 
     steps:
+    - name: Set up basic tools
+      run: |
+        apt-get update
+        # Recommended to install locales if you see locale issues
+        apt-get install -y locales
+        # Choose your locale
+        locale-gen en_US.UTF-8
+        update-locale LANG=en_US.UTF-8
+
+        # Core packages
+        apt-get install -y \
+          curl \
+          git \
+          gnupg \
+          unzip \
+          zip \
+          wget \
+          pkg-config \
+          build-essential \
+          lld
+
+        # Optionally, install clang-17 from apt.llvm.org if not available by default
+        wget -qO- https://apt.llvm.org/llvm.sh | bash -s -- 17
+        ln -sf /usr/bin/clang-17 /usr/bin/clang
+        ln -sf /usr/bin/clang++-17 /usr/bin/clang++
+
+        echo "Clang version: $(clang --version)"
+
+        # Install Python 3.11
+        apt-get install -y python3.11 python3.11-dev python3.11-venv python3-pip
+
+        # Set python3 as default (optional):
+        # ln -sf /usr/bin/python3.11 /usr/bin/python3
+
+        # Install Bazel from bazel.build (official instructions)
+        curl -fsSL https://bazel.build/bazel-release.pub.gpg | gpg --dearmor > /usr/share/keyrings/bazel.gpg
+        echo "deb [arch=amd64 signed-by=/usr/share/keyrings/bazel.gpg] https://storage.googleapis.com/bazel-apt stable jdk1.8" > /etc/apt/sources.list.d/bazel.list
+        apt-get update && apt-get install -y bazel
+
     - name: Checkout TensorFlow
       uses: actions/checkout@v4
       with:
         repository: tensorflow/tensorflow
         submodules: true
         fetch-depth: 0
+        # Use the TFLite version environment variable
         ref: v${{ env.TFLITE_VERSION }}
 
-    - name: Setup Docker and Dependencies
+    - name: Create and activate virtual environment
       run: |
-        sudo apt update
-        #sudo apt remove -y docker.io containerd runc || true
-        sudo apt remove -y llvm*
-        sudo apt install -y build-essential lld git zip unzip pkg-config curl gcc-12 wget
-        #curl -fsSL https://get.docker.com | sudo sh
-        wget -qO- https://apt.llvm.org/llvm.sh | sudo bash -s -- 17
-        sudo ln -sf /usr/bin/clang-17 /usr/bin/clang
-        echo "Clang version is $(clang-17 --version)"
+        python3.11 -m venv /tmp/tflite_env
+        source /tmp/tflite_env/bin/activate
+        pip install --upgrade pip wheel setuptools
+        # For TFLite, you usually need a matching NumPy version
+        pip install numpy==1.26.4 auditwheel
 
-    - name: Install dependencies
+    - name: Build TFLite Runtime Wheel
       run: |
-        set -x
-
-          echo "Building TFLite Runtime for ${{ matrix.arch }} / Python ${{ matrix.python }}"
-
-          # ========== 1) Install System Dependencies ==========
-          sudo add-apt-repository ppa:deadsnakes/ppa
-          sudo apt-get update
-          sudo apt-get install -y \
-            python${{ matrix.python_version }} build-essential lld git zip unzip pkg-config curl \
-            python${{ matrix.python_version }}-dev python${{ matrix.python_version }}-venv \
-            python-is-python3
-            # gcc-12 g++-12 libicu70
-
-          # ========== 2) Create and Activate Python Virtual Env ==========
-          python${{ matrix.python }} -m venv /tmp/tflite_env
-          source /tmp/tflite_env/bin/activate
-          pip install --upgrade pip wheel numpy==1.26.4 auditwheel setuptools
-
-    - name: Build TFLite Runtime Wheel using Docker
-      run: |
+        source /tmp/tflite_env/bin/activate
         export PYTHON_VERSION="${{ matrix.python_version }}"
         export NUMPY_VERSION="1.24.4"
         export TENSORFLOW_TARGET="${{ matrix.arch }}"
-        # Add xnnpack
+        export CC=clang
+        export CXX=clang++
+
+        # Enable XNNPACK & Flex
         CUSTOM_BAZEL_FLAGS+="--define=tflite_pip_with_xnnpack=true --define=tflite_pip_with_xnnpack_reshaping=true "
-        # Add flex
         CUSTOM_BAZEL_FLAGS+="--define=tflite_pip_with_flex=true "
-        # Remove avx
+        # If building for x86_64 with no AVX
         if [[ "${{ matrix.arch }}" == "x86_64" ]]; then
-          CUSTOM_BAZEL_FLAGS+="$CUSTOM_BAZEL_FLAGS --copt=-mno-avx --copt=-mno-avx2 --copt=-msse4.2 --copt=-msse4.1 "
+          CUSTOM_BAZEL_FLAGS+="--copt=-mno-avx --copt=-mno-avx2 --copt=-msse4.2 --copt=-msse4.1 "
         fi
-        # Increase speed
+        # Speed and size
         CUSTOM_BAZEL_FLAGS+="--define xnnpack_force_float_precision=fp16 "
-        # Reduce size
         CUSTOM_BAZEL_FLAGS+="--define=no_tensorflow_py_deps=true --strip=always "
-        # Fix build issues
         CUSTOM_BAZEL_FLAGS+="--copt=-Wno-gnu-offsetof-extensions --features=-layering_check "
 
-        if [[ "${{ matrix.arch }}" == "aarch64" ]]; then
-          TARGET_ARCH="aarch64"
-          PYTHON_ENV="PI-PYTHON${PYTHON_VERSION//./}"
-        else
-          TARGET_ARCH="native"
-          PYTHON_ENV="PI-PYTHON${PYTHON_VERSION//./}"
-        fi
-
         export CUSTOM_BAZEL_FLAGS
-        export TF_PYTHON_VERSION="${{ matrix.python_version }}"
-        export CC=clang-17
-        export CXX=clang++-17
+        export TF_PYTHON_VERSION="${PYTHON_VERSION}"
+
+        # Ensure a clean slate
         sed -i "/^bazel/i\bazel clean --expunge" tensorflow/lite/tools/pip_package/build_pip_package_with_bazel.sh
+
+        # Build the pip package using Bazel
         ./tensorflow/lite/tools/pip_package/build_pip_package_with_bazel.sh
-        
-        #CI_DOCKER_EXTRA_PARAMS="-e CUSTOM_BAZEL_FLAGS=$CUSTOM_BAZEL_FLAGS" \
-        #  tensorflow/tools/ci_build/ci_build.sh $PYTHON_ENV \
-        #  tensorflow/lite/tools/pip_package/build_pip_package_with_bazel.sh $TARGET_ARCH
-          
+
     - name: Prepare Wheel for Upload
       run: |
         mkdir -p /home/runner/work/wheels
@@ -103,8 +114,11 @@ jobs:
           echo "Error: No wheel file found!"
           exit 1
         fi
+
+        # For Python 3.11 => "cp311"
         echo "PY_TAG=$(echo ${{ matrix.python_version }} | sed 's/\\.//g')" >> $GITHUB_ENV
-        NEW_WHEEL_PATH="/home/runner/work/wheels/tflite_runtime-${{ env.TFLITE_VERSION }}${{ matrix.arch == 'x86_64-noavx' && '_noavx' || '' }}-cp${{ env.PY_TAG }}-cp${{ env.PY_TAG }}-linux_${{ matrix.arch == 'x86_64-noavx' && 'x86_64' || matrix.arch }}.whl"
+
+        NEW_WHEEL_PATH="/home/runner/work/wheels/tflite_runtime-${{ env.TFLITE_VERSION }}-${{ matrix.arch }}-cp${{ env.PY_TAG }}-cp${{ env.PY_TAG }}-linux_${{ matrix.arch }}.whl"
         mv "$WHEEL_PATH" "$NEW_WHEEL_PATH"
         echo "Wheel created: $NEW_WHEEL_PATH"
 
@@ -117,7 +131,7 @@ jobs:
     - name: Upload Wheel Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: tflite_runtime-${{ env.TFLITE_VERSION }}${{ matrix.arch == 'x86_64-noavx' && '_noavx' || '' }}-cp${{ env.PY_TAG }}-cp${{ env.PY_TAG }}-linux_${{ matrix.arch == 'x86_64-noavx' && 'x86_64' || matrix.arch }}
+        name: "tflite_runtime-${{ env.TFLITE_VERSION }}-${{ matrix.arch }}"
         path: /home/runner/work/wheels/*.whl
 
   release:
@@ -156,6 +170,6 @@ jobs:
 
       - name: Upload Wheels to GitHub Release
         run: |
-          gh release upload ${{ env.TFLITE_VERSION }} wheels/**/*.whl --clobber -R "${{ github.repository }}"
+          gh release upload ${{ env.TFLITE_VERSION }}2 wheels/**/*.whl --clobber -R "${{ github.repository }}"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
