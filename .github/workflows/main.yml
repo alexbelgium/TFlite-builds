@@ -145,10 +145,10 @@ jobs:
 
       - name: Create GitHub Release (if not exists)
         run: |
-          if gh release view ${{ env.TFLITE_VERSION }}2 -R "${{ github.repository }}" > /dev/null 2>&1; then
+          if gh release view ${{ env.TFLITE_VERSION }} -R "${{ github.repository }}" > /dev/null 2>&1; then
             echo "Release already exists. Skipping creation."
           else
-            gh release create ${{ env.TFLITE_VERSION }}2 \
+            gh release create ${{ env.TFLITE_VERSION }} \
               -R "${{ github.repository }}" \
               --title "tflite_runtime ${{ env.TFLITE_VERSION }}" \
               --notes "Automated build for tflite_runtime ${{ env.TFLITE_VERSION }}"
