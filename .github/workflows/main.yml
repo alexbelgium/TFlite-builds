@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-22.04
     strategy:
       matrix:
-        python_version: ["3.11"]
+        python: ["3.11"]
         arch: ["x86_64"]
 
     steps:
@@ -41,14 +41,14 @@ jobs:
       shell: bash
       run: |
         set -xe
-        echo "Building TFLite Runtime for ${{ matrix.arch }} / Python ${{ matrix.python_version }}"
+        echo "Building TFLite Runtime for ${{ matrix.arch }} / Python ${{ matrix.python }}"
         sudo add-apt-repository ppa:deadsnakes/ppa
         sudo apt-get update
         sudo apt-get install -y \
-          python${{ matrix.python_version }} build-essential lld git zip unzip pkg-config curl \
-          python${{ matrix.python_version }}-dev python${{ matrix.python_version }}-venv \
+          python${{ matrix.python }} build-essential lld git zip unzip pkg-config curl \
+          python${{ matrix.python }}-dev python${{ matrix.python }}-venv \
           python-is-python3
-        python${{ matrix.python_version }} -m venv /tmp/tflite_env
+        python${{ matrix.python }} -m venv /tmp/tflite_env
         source /tmp/tflite_env/bin/activate
         pip install --upgrade pip wheel numpy==1.26.4 auditwheel setuptools
 
@@ -100,8 +100,9 @@ jobs:
 
         source /tmp/tflite_env/bin/activate
         python --version        
-        export PYTHON_VERSION="${{ matrix.python_version }}"
+        export PYTHON_VERSION="${{ matrix.python }}"
         export TF_PYTHON_VERSION="$PYTHON_VERSION"
+        export TF_python="$python"
         export NUMPY_VERSION="1.24.4"
         export TENSORFLOW_TARGET="${{ matrix.arch }}"
         CUSTOM_BAZEL_FLAGS="--define=tflite_pip_with_xnnpack=true --define=tflite_pip_with_xnnpack_reshaping=true "
@@ -109,6 +110,7 @@ jobs:
         CUSTOM_BAZEL_FLAGS+="--define xnnpack_force_float_precision=fp16 "
         CUSTOM_BAZEL_FLAGS+="--define=no_tensorflow_py_deps=true --strip=always "
         CUSTOM_BAZEL_FLAGS+="--features=-layering_check "
+        
         if [[ "${{ matrix.arch }}" == "aarch64" ]]; then
           TARGET_ARCH="aarch64"
           sudo apt-get install -y libicu70
@@ -117,8 +119,8 @@ jobs:
           CUSTOM_BAZEL_FLAGS+="--copt=-Wno-gnu-offsetof-extensions "
           TARGET_ARCH="native"
         fi
+        
         export CUSTOM_BAZEL_FLAGS
-        export TF_PYTHON_VERSION="${{ matrix.python_version }}"
         export CC=clang-17
         export CXX=clang++-17
         sed -i "/^bazel/i\bazel clean --expunge" tensorflow/lite/tools/pip_package/build_pip_package_with_bazel.sh
@@ -133,8 +135,9 @@ jobs:
           echo "Error: No wheel file found!"
           exit 1
         fi
-        echo "PY_TAG=$(echo ${{ matrix.python_version }} | sed 's/\.//g')" >> $GITHUB_ENV
-        NEW_WHEEL_PATH="/home/runner/work/wheels/tflite_runtime-${{ env.TFLITE_VERSION }}-cp${{ env.PY_TAG }}-cp${{ env.PY_TAG }}-linux_${{ matrix.arch }}.whl"
+        PY_TAG=$(echo ${{ matrix.python }} | sed 's/\.//g')
+        echo "PY_TAG=$PY_TAG" >> $GITHUB_ENV
+        NEW_WHEEL_PATH="/home/runner/work/wheels/tflite_runtime-${{ env.TFLITE_VERSION }}-cp${PY_TAG}-cp${PY_TAG}-linux_${{ matrix.arch }}.whl"
         mv "$WHEEL_PATH" "$NEW_WHEEL_PATH"
         echo "Wheel created: $NEW_WHEEL_PATH"
 
