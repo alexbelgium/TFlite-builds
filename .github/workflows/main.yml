@@ -94,7 +94,11 @@ jobs:
       shell: bash    
       run: |
         set -xe
+
+        source /tmp/tflite_env/bin/activate
+        python --version        
         export PYTHON_VERSION="${{ matrix.python_version }}"
+        export TF_PYTHON_VERSION="$PYTHON_VERSION"
         export NUMPY_VERSION="1.24.4"
         export TENSORFLOW_TARGET="${{ matrix.arch }}"
         CUSTOM_BAZEL_FLAGS="--define=tflite_pip_with_xnnpack=true --define=tflite_pip_with_xnnpack_reshaping=true "
