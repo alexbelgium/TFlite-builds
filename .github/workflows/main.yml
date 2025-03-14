@@ -8,6 +8,10 @@ env:
   TFLITE_VERSION: "2.17.1"
   BASE_IMAGE: "ubuntu:22.04"
 
+permissions:
+  contents: read
+  packages: write
+
 jobs:
   build:
     runs-on: ubuntu-22.04
