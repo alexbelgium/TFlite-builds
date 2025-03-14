@@ -9,8 +9,7 @@ env:
   BASE_IMAGE: "ubuntu:22.04"
 
 permissions:
-  contents: read
-  packages: write
+  contents: write
 
 jobs:
   build:
