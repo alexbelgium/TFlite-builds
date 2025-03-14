@@ -107,20 +107,20 @@ jobs:
         export TENSORFLOW_TARGET="${{ matrix.arch }}"
         CUSTOM_BAZEL_FLAGS="--define=tflite_pip_with_xnnpack=true --define=tflite_pip_with_xnnpack_reshaping=true "
         CUSTOM_BAZEL_FLAGS+="--define=tflite_pip_with_flex=true "
-        CUSTOM_BAZEL_FLAGS+="--define xnnpack_force_float_precision=fp16 "
-        CUSTOM_BAZEL_FLAGS+="--linkopt=-flto --copt=-flto --define=no_tensorflow_py_deps=true --strip=always "
+        CUSTOM_BAZEL_FLAGS+="--copt=-O3 --linkopt=-flto --copt=-flto --define=no_tensorflow_py_deps=true --strip=always "
+        CUSTOM_BAZEL_FLAGS+="--copt=-ffunction-sections --linkopt=-Wl,--gc-sections --copt=-DNDEBUG --copt=-fvisibility=hidden "
         CUSTOM_BAZEL_FLAGS+="--features=-layering_check "
-        
         if [[ "${{ matrix.arch }}" == "aarch64" ]]; then
           TARGET_ARCH="aarch64"
-          sudo apt-get install -y libicu70
+          apt-get install -y libicu70
         else
-          CUSTOM_BAZEL_FLAGS+=" --copt=-mno-avx --copt=-mno-avx2 --copt=-msse4.2 --copt=-msse4.1 "
+          CUSTOM_BAZEL_FLAGS+=" --copt=-mno-avx --copt=-mno-avx2 "
           CUSTOM_BAZEL_FLAGS+="--copt=-Wno-gnu-offsetof-extensions "
-          TARGET_ARCH="native"
+          CUSTOM_BAZEL_FLAGS+="--copt=-march=x86-64 "
+          TARGET_ARCH=""
         fi
-        
         export CUSTOM_BAZEL_FLAGS
+
         export CC=clang-17
         export CXX=clang++-17
         sed -i "/^bazel/i\bazel clean --expunge" tensorflow/lite/tools/pip_package/build_pip_package_with_bazel.sh
