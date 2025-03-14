@@ -25,7 +25,7 @@ jobs:
         fetch-depth: 0
         ref: v${{ env.TFLITE_VERSION }}
 
-    - name: Setup Docker and Dependencies
+    - name: Setup Dependencies
       run: |
         sudo apt update
         sudo apt remove -y llvm*
@@ -34,7 +34,7 @@ jobs:
         sudo ln -sf /usr/bin/clang-17 /usr/bin/clang
         echo "Clang version is $(clang-17 --version)"
 
-    - name: Install dependencies
+    - name: Install python
       shell: bash
       run: |
         set -xe
@@ -48,6 +48,47 @@ jobs:
         python${{ matrix.python_version }} -m venv /tmp/tflite_env
         source /tmp/tflite_env/bin/activate
         pip install --upgrade pip wheel numpy==1.26.4 auditwheel setuptools
+
+    - name: Configure arm64 Repositories
+      if: matrix.arch == 'aarch64'
+      run: |
+          [[ "$(lsb_release -si)" == "Ubuntu" ]] || exit 0
+          sudo sed -i "s/deb\ /deb \[arch=amd64\]\ /g" /etc/apt/sources.list
+
+          if [[ "$(lsb_release -sc)" == "noble" ]]; then
+            echo "NOBLE"
+            sudo rm -f /etc/apt/sources.list.d/ubuntu.sources
+            sudo tee /etc/apt/sources.list.d/ubuntu.sources > /dev/null <<EOT
+          Types: deb
+          URIs: http://archive.ubuntu.com/ubuntu/
+          Suites: noble noble-updates noble-backports
+          Components: main universe restricted multiverse
+          Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+          Architectures: amd64
+
+          ## Ubuntu security updates
+          Types: deb
+          URIs: http://security.ubuntu.com/ubuntu/
+          Suites: noble-security
+          Components: main universe restricted multiverse
+          Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+          Architectures: amd64
+
+          Types: deb
+          URIs: http://ports.ubuntu.com/ubuntu-ports
+          Suites: noble noble-updates noble-security
+          Components: main universe
+          Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+          Architectures: arm64 armhf
+          EOT
+
+          else
+            sudo tee -a /etc/apt/sources.list > /dev/null <<EOT
+          deb [arch=arm64,armhf] http://ports.ubuntu.com/ubuntu-ports $(lsb_release -sc) main universe
+          deb [arch=arm64,armhf] http://ports.ubuntu.com/ubuntu-ports $(lsb_release -sc)-updates main universe
+          deb [arch=arm64,armhf] http://ports.ubuntu.com/ubuntu-ports $(lsb_release -sc)-security main universe
+          EOT
+          fi
 
     - name: Build TFLite Runtime Wheel using Docker
       shell: bash    
@@ -63,7 +104,7 @@ jobs:
         CUSTOM_BAZEL_FLAGS+="--features=-layering_check "
         if [[ "${{ matrix.arch }}" == "aarch64" ]]; then
           TARGET_ARCH="aarch64"
-          apt-get install -y libicu70
+          sudo apt-get install -y libicu70
         else
           CUSTOM_BAZEL_FLAGS+=" --copt=-mno-avx --copt=-mno-avx2 --copt=-msse4.2 --copt=-msse4.1 "
           CUSTOM_BAZEL_FLAGS+="--copt=-Wno-gnu-offsetof-extensions "
