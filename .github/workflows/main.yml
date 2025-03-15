@@ -109,6 +109,7 @@ jobs:
         CUSTOM_BAZEL_FLAGS+="--define=tflite_pip_with_flex=true "
         CUSTOM_BAZEL_FLAGS+="--copt=-O3 --linkopt=-flto --copt=-flto --define=no_tensorflow_py_deps=true --strip=always "
         CUSTOM_BAZEL_FLAGS+="--copt=-ffunction-sections --linkopt=-Wl,--gc-sections --copt=-DNDEBUG --copt=-fvisibility=hidden "
+        CUSTOM_BAZEL_FLAGS+="--linkopt=-fuse-ld=lld --local_ram_resources=2048 --jobs=2 "
         CUSTOM_BAZEL_FLAGS+="--features=-layering_check "
         if [[ "${{ matrix.arch }}" == "aarch64" ]]; then
           TARGET_ARCH="aarch64"
